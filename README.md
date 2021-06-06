@@ -1,5 +1,3 @@
-# genartexp_0000_zig
+# julia
 
-Requires latest Zig compiler to build.
-
-Requires NVIDIA GPU to run.
+quaternion julia sets
