@@ -10,18 +10,25 @@ const window_height = 1080;
 var oglppo: c.GLuint = 0;
 
 // zig fmt: off
-const glsl_cs_image_a =
+const cs_image_a = struct {
+const group_size_x = 16;
+const group_size_y = 16;
+const frame_loc = 0;
+const time_loc = 1;
+const resolution_loc = 2;
+const image_unit = 0;
+const src =
 \\  #version 460 core
 \\
-++ "layout("
-++ "    local_size_x = " ++ comptimePrint("{d}", .{16}) ++ ", "
-++ "    local_size_y = " ++ comptimePrint("{d}", .{16}) ++ ") in;"
-++
-\\  layout(location = 0) uniform int u_frame;
-\\  layout(location = 1) uniform float u_time;
-\\  layout(location = 2) uniform vec2 u_resolution;
+++ "layout(\n"
+++ "    local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ",\n"
+++ "    local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
 \\
-\\  layout(binding = 0) uniform writeonly image2D u_image;
+++ "layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n"
+++ "layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n"
+++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+\\
+++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform writeonly image2D u_image;\n" ++
 \\
 \\  const float k_foc_len = 3.0;
 \\
@@ -67,10 +74,10 @@ const glsl_cs_image_a =
 \\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
 \\      vec3 rd = normalize(vec3(p, k_foc_len));
 \\
-\\      vec4 color = vec4(frand(), frand(), frand(), 1.0);
+\\      vec4 color = vec4(frand(), frand(), frand(), u_time);
 \\      imageStore(u_image, q, color);
 \\  }
-;
+;};
 // zig fmt: on
 
 fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
@@ -147,7 +154,7 @@ pub fn main() !void {
     );
     defer c.glDeleteTextures(1, &image_a);
 
-    const cs = createShaderProgram(c.GL_COMPUTE_SHADER, glsl_cs_image_a);
+    const cs = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src);
     defer c.glDeleteProgram(cs);
 
     var fbo: c.GLuint = 0;
@@ -159,16 +166,16 @@ pub fn main() !void {
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
 
-        c.glProgramUniform1i(cs, 0, frame_num);
-        c.glProgramUniform1f(cs, 1, @floatCast(f32, stats.time));
+        c.glProgramUniform1i(cs, cs_image_a.frame_loc, frame_num);
+        c.glProgramUniform1f(cs, cs_image_a.time_loc, @floatCast(f32, stats.time));
         c.glProgramUniform2f(
             cs,
-            2,
+            cs_image_a.resolution_loc,
             @intToFloat(f32, window_width),
             @intToFloat(f32, window_height),
         );
         c.glBindImageTexture(
-            0, // unit
+            cs_image_a.image_unit,
             image_a,
             0, // level
             c.GL_FALSE, // layered
@@ -177,7 +184,11 @@ pub fn main() !void {
             c.GL_RGBA32F,
         );
         c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs);
-        c.glDispatchCompute((window_width + 15) / 16, (window_height + 15) / 16, 1);
+        c.glDispatchCompute(
+            (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
+            (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
+            1,
+        );
         c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
         c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
