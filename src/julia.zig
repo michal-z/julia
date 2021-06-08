@@ -31,6 +31,9 @@ const src =
 ++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform writeonly image2D u_image;\n" ++
 \\
 \\  const float k_foc_len = 3.0;
+\\  const float k_precis = 0.00025;
+\\  const int k_num_iter = 100;
+\\  const vec4 k_c = vec4(-0.2, 0.2, 0.2, 0.6);
 \\
 \\  int seed = 1;
 \\  void srand(int s) {
@@ -62,19 +65,81 @@ const src =
 \\          q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y);
 \\  }
 \\
-\\  void main() {
-\\      ivec2 q = ivec2(gl_GlobalInvocationID);
-\\      if (q.x >= int(u_resolution.x) || q.y > int(u_resolution.y)) {
-\\          return;
+\\  vec2 map(vec3 p) {
+\\      vec4 z = vec4(p, 0.0);
+\\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
+\\      float m2 = 0.0;
+\\      float n = 0.0;
+\\      for (int i = 0; i < k_num_iter; ++i) {
+\\          zp = 2.0 * qMul(z, zp);
+\\          z = qSquare(z) + k_c;
+\\          m2 = dot(z, z);
+\\          if (m2 > 10.0) {
+\\              break;
+\\          }
+\\          n += 1.0;
 \\      }
-\\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
+\\      float m = sqrt(m2);
+\\      return vec2(0.5 * m * log(m) / length(zp), n);
+\\  }
 \\
+\\  vec2 raycast(vec3 ro, vec3 rd) {
+\\      vec2 res;
+\\      float t = 0.001;
+\\      for (int i = 0; i < 1024; ++i) {
+\\          res = map(ro + rd * t);
+\\          if (res.x < k_precis) {
+\\              break;
+\\          }
+\\          t += min(res.x, 0.2);
+\\          if (t > 256.0) {
+\\              break;
+\\          }
+\\      }
+\\      res.x = (t < 10.0) ? t : -1.0;
+\\      return res;
+\\  }
+\\
+\\  vec3 calcNormal(vec3 pos) {
+\\      const vec2 e = vec2(1.0, -1.0) * 0.5773 * k_precis;
+\\      return normalize(
+\\          e.xyy * map(pos + e.xyy).x +
+\\          e.yyx * map(pos + e.yyx).x +
+\\          e.yxy * map(pos + e.yxy).x +
+\\          e.xxx * map(pos + e.xxx).x);
+\\  }
+\\
+\\  vec3 render(vec2 fragcoord, vec3 ro, vec3 rd, out vec3 out_pos, out float out_t) {
+\\      vec3 color_mask = vec3(1.0);
+\\      out_t = 1e20;
+\\      vec2 tn = raycast(ro, rd);
+\\      if (tn.x < 0.0) {
+\\          return vec3(0.0);
+\\      }
+\\      vec3 pos = ro + rd * tn.x;
+\\      vec3 nor = calcNormal(pos);
+\\      return color_mask * abs(nor);
+\\  }
+\\
+\\  void main() {
+\\      //if (q.x >= int(u_resolution.x) || q.y > int(u_resolution.y)) {
+\\          //return;
+\\      //}
+\\      //srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
+\\
+\\      ivec2 q = ivec2(gl_GlobalInvocationID);
 \\      vec2 fragcoord = q + vec2(0.5);
 \\
-\\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
-\\      vec3 rd = normalize(vec3(p, k_foc_len));
+\\      vec3 ro = vec3(0.0, 0.0, 3.1);
 \\
-\\      vec4 color = vec4(frand(), frand(), frand(), u_time);
+\\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
+\\      vec3 rd = -normalize(vec3(p, k_foc_len));
+\\
+\\      vec3 pos;
+\\      float res_t;
+\\      vec3 col = render(fragcoord, ro, rd, pos, res_t);
+\\
+\\      vec4 color = vec4(col, u_time);
 \\      imageStore(u_image, q, color);
 \\  }
 ;};
