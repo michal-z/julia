@@ -175,7 +175,7 @@ const src =
 \\  }
 \\
 \\  vec3 colorSurface(vec3 pos, vec3 nor, vec2 tn) {
-\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 +vec3(0.0, 0.6, 1.0));
+\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(0.0, 0.6, 1.0));
 \\      if (pos.y > 0.0) col = mix(col, vec3(1.0), 0.2);
 \\      float inside = smoothstep(14.0, 15.0, tn.y);
 \\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
