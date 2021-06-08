@@ -11,8 +11,8 @@ var oglppo: c.GLuint = 0;
 
 // zig fmt: off
 const cs_image_a = struct {
-const group_size_x = 16;
-const group_size_y = 16;
+const group_size_x = 8;
+const group_size_y = 8;
 const frame_loc = 0;
 const time_loc = 1;
 const resolution_loc = 2;
@@ -83,6 +83,20 @@ const src =
 \\      if (h < 0.0) return vec2(-1.0);
 \\      h = sqrt(h);
 \\      return vec2(-b -h, -b + h);
+\\  }
+\\
+\\  vec3 calcDirection(vec3 nor) {
+\\      float u = frand() * 2.0 - 1.0;
+\\      float a = frand() * 6.28318531;
+\\      return normalize(nor + vec3(sqrt(1.0 -u * u) * vec2(cos(a), sin(a)), u));
+\\  }
+\\
+\\  mat3 setCamera(vec3 ro, vec3 ta, float cr) {
+\\      vec3 cw = normalize(ta - ro);
+\\      vec3 cp = vec3(sin(cr), cos(cr), 0.0);
+\\      vec3 cu = normalize(cross(cw, cp));
+\\      vec3 cv = normalize(cross(cu, cw));
+\\      return mat3(cu, cv, cw);
 \\  }
 \\
 \\  vec2 map(vec3 p) {
@@ -187,29 +201,39 @@ const src =
 \\  vec3 render(vec2 fragcoord, vec3 ro, vec3 rd, out vec3 out_pos, out float out_t) {
 \\      vec3 color_mask = vec3(1.0);
 \\      out_t = 1e20;
-\\      vec2 tn = castRay(ro, rd);
-\\      if (tn.x < 0.0) {
-\\          return vec3(0.0);
+\\
+\\      for (int bounce = 0; bounce < 3; ++bounce) {
+\\          vec2 tn = castRay(ro, rd);
+\\          float t = tn.x;
+\\          if (t < 0.0) {
+\\              return bounce > 0 ? color_mask * 1.65 * step(0.0, rd.y) : vec3(clamp(0.02 + 0.021 * rd.y, 0.0, 1.0));
+\\          } else {
+\\              vec3 pos = ro + rd * t;
+\\              vec3 nor = calcNormal(pos);
+\\              color_mask *= colorSurface(pos, nor, tn);
+\\              rd = calcDirection(nor);
+\\              ro = pos + nor * k_precis;
+\\          }
 \\      }
-\\      vec3 pos = ro + rd * tn.x;
-\\      vec3 nor = calcNormal(pos);
-\\      color_mask = colorSurface(pos, nor, tn);
-\\      return color_mask;
+\\      return vec3(0.0);
 \\  }
 \\
 \\  void main() {
-\\      //if (q.x >= int(u_resolution.x) || q.y > int(u_resolution.y)) {
-\\          //return;
-\\      //}
-\\      //srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
-\\
 \\      ivec2 q = ivec2(gl_GlobalInvocationID);
+\\      if (q.x >= int(u_resolution.x) || q.y > int(u_resolution.y)) {
+\\          return;
+\\      }
+\\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
+\\
 \\      vec2 fragcoord = q + vec2(0.5);
 \\
-\\      vec3 ro = vec3(0.0, 0.0, 3.1);
+\\      float an = 0.5 + u_time * 0.03;
+\\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
+\\      vec3 ta = vec3(0.0, -0.1, 0.0);
+\\      mat3x3 cam = setCamera(ro, ta, 0.0);
 \\
 \\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
-\\      vec3 rd = -normalize(vec3(p, k_foc_len));
+\\      vec3 rd = normalize(cam * vec3(p, k_foc_len));
 \\
 \\      vec3 pos;
 \\      float res_t;
