@@ -10,9 +10,6 @@ pub var glTextureParameteri: @typeInfo(PFNGLTEXTUREPARAMETERIPROC).Optional.chil
 pub var glTextureParameterf: @typeInfo(PFNGLTEXTUREPARAMETERFPROC).Optional.child = undefined;
 pub var glTextureParameterfv: @typeInfo(PFNGLTEXTUREPARAMETERFVPROC).Optional.child = undefined;
 pub var glTextureSubImage2D: @typeInfo(PFNGLTEXTURESUBIMAGE2DPROC).Optional.child = undefined;
-pub var glDrawTextureNV: @typeInfo(PFNGLDRAWTEXTURENVPROC).Optional.child = undefined;
-pub var glMatrixLoadIdentityEXT: @typeInfo(PFNGLMATRIXLOADIDENTITYEXTPROC).Optional.child = undefined;
-pub var glMatrixOrthoEXT: @typeInfo(PFNGLMATRIXORTHOEXTPROC).Optional.child = undefined;
 pub var glCreateFramebuffers: @typeInfo(PFNGLCREATEFRAMEBUFFERSPROC).Optional.child = undefined;
 pub var glDeleteFramebuffers: @typeInfo(PFNGLDELETEFRAMEBUFFERSPROC).Optional.child = undefined;
 pub var glBindFramebuffer: @typeInfo(PFNGLBINDFRAMEBUFFERPROC).Optional.child = undefined;
@@ -27,17 +24,6 @@ pub var glCreateShaderProgramv: @typeInfo(PFNGLCREATESHADERPROGRAMVPROC).Optiona
 pub var glDeleteProgram: @typeInfo(PFNGLDELETEPROGRAMPROC).Optional.child = undefined;
 pub var glCreateProgramPipelines: @typeInfo(PFNGLCREATEPROGRAMPIPELINESPROC).Optional.child = undefined;
 pub var glBindProgramPipeline: @typeInfo(PFNGLBINDPROGRAMPIPELINEPROC).Optional.child = undefined;
-pub var glStencilFillPathNV: @typeInfo(PFNGLSTENCILFILLPATHNVPROC).Optional.child = undefined;
-pub var glStencilStrokePathNV: @typeInfo(PFNGLSTENCILSTROKEPATHNVPROC).Optional.child = undefined;
-pub var glCoverFillPathNV: @typeInfo(PFNGLCOVERFILLPATHNVPROC).Optional.child = undefined;
-pub var glCoverStrokePathNV: @typeInfo(PFNGLCOVERSTROKEPATHNVPROC).Optional.child = undefined;
-pub var glStencilThenCoverFillPathNV: @typeInfo(PFNGLSTENCILTHENCOVERFILLPATHNVPROC).Optional.child = undefined;
-pub var glStencilThenCoverStrokePathNV: @typeInfo(PFNGLSTENCILTHENCOVERSTROKEPATHNVPROC).Optional.child = undefined;
-pub var glPathCommandsNV: @typeInfo(PFNGLPATHCOMMANDSNVPROC).Optional.child = undefined;
-pub var glPathParameteriNV: @typeInfo(PFNGLPATHPARAMETERINVPROC).Optional.child = undefined;
-pub var glPathParameterivNV: @typeInfo(PFNGLPATHPARAMETERIVNVPROC).Optional.child = undefined;
-pub var glPathParameterfNV: @typeInfo(PFNGLPATHPARAMETERFNVPROC).Optional.child = undefined;
-pub var glPathParameterfvNV: @typeInfo(PFNGLPATHPARAMETERFVNVPROC).Optional.child = undefined;
 pub var glProgramUniform1f: @typeInfo(PFNGLPROGRAMUNIFORM1FPROC).Optional.child = undefined;
 pub var glProgramUniform2f: @typeInfo(PFNGLPROGRAMUNIFORM2FPROC).Optional.child = undefined;
 pub var glProgramUniform1i: @typeInfo(PFNGLPROGRAMUNIFORM1IPROC).Optional.child = undefined;
@@ -47,6 +33,8 @@ pub var glDispatchCompute: @typeInfo(PFNGLDISPATCHCOMPUTEPROC).Optional.child = 
 pub var glGetProgramiv: @typeInfo(PFNGLGETPROGRAMIVPROC).Optional.child = undefined;
 pub var glGetProgramInfoLog: @typeInfo(PFNGLGETPROGRAMINFOLOGPROC).Optional.child = undefined;
 pub var glBindImageTexture: @typeInfo(PFNGLBINDIMAGETEXTUREPROC).Optional.child = undefined;
+pub var glTextureBarrier: @typeInfo(PFNGLTEXTUREBARRIERPROC).Optional.child = undefined;
+pub var glClearTexImage: @typeInfo(PFNGLCLEARTEXIMAGEPROC).Optional.child = undefined;
 
 pub fn initOpenGlEntryPoints() void {
     glCreateTextures = @ptrCast(@TypeOf(glCreateTextures), glfwGetProcAddress("glCreateTextures").?);
@@ -56,9 +44,6 @@ pub fn initOpenGlEntryPoints() void {
     glTextureParameterf = @ptrCast(@TypeOf(glTextureParameterf), glfwGetProcAddress("glTextureParameterf").?);
     glTextureParameterfv = @ptrCast(@TypeOf(glTextureParameterfv), glfwGetProcAddress("glTextureParameterfv").?);
     glTextureSubImage2D = @ptrCast(@TypeOf(glTextureSubImage2D), glfwGetProcAddress("glTextureSubImage2D").?);
-    glDrawTextureNV = @ptrCast(@TypeOf(glDrawTextureNV), glfwGetProcAddress("glDrawTextureNV").?);
-    glMatrixLoadIdentityEXT = @ptrCast(@TypeOf(glMatrixLoadIdentityEXT), glfwGetProcAddress("glMatrixLoadIdentityEXT").?);
-    glMatrixOrthoEXT = @ptrCast(@TypeOf(glMatrixOrthoEXT), glfwGetProcAddress("glMatrixOrthoEXT").?);
     glCreateFramebuffers = @ptrCast(@TypeOf(glCreateFramebuffers), glfwGetProcAddress("glCreateFramebuffers").?);
     glDeleteFramebuffers = @ptrCast(@TypeOf(glDeleteFramebuffers), glfwGetProcAddress("glDeleteFramebuffers").?);
     glBindFramebuffer = @ptrCast(@TypeOf(glBindFramebuffer), glfwGetProcAddress("glBindFramebuffer").?);
@@ -73,17 +58,6 @@ pub fn initOpenGlEntryPoints() void {
     glDeleteProgram = @ptrCast(@TypeOf(glDeleteProgram), glfwGetProcAddress("glDeleteProgram").?);
     glCreateProgramPipelines = @ptrCast(@TypeOf(glCreateProgramPipelines), glfwGetProcAddress("glCreateProgramPipelines").?);
     glBindProgramPipeline = @ptrCast(@TypeOf(glBindProgramPipeline), glfwGetProcAddress("glBindProgramPipeline").?);
-    glStencilFillPathNV = @ptrCast(@TypeOf(glStencilFillPathNV), glfwGetProcAddress("glStencilFillPathNV").?);
-    glStencilStrokePathNV = @ptrCast(@TypeOf(glStencilStrokePathNV), glfwGetProcAddress("glStencilStrokePathNV").?);
-    glCoverFillPathNV = @ptrCast(@TypeOf(glCoverFillPathNV), glfwGetProcAddress("glCoverFillPathNV").?);
-    glCoverStrokePathNV = @ptrCast(@TypeOf(glCoverStrokePathNV), glfwGetProcAddress("glCoverStrokePathNV").?);
-    glStencilThenCoverFillPathNV = @ptrCast(@TypeOf(glStencilThenCoverFillPathNV), glfwGetProcAddress("glStencilThenCoverFillPathNV").?);
-    glStencilThenCoverStrokePathNV = @ptrCast(@TypeOf(glStencilThenCoverStrokePathNV), glfwGetProcAddress("glStencilThenCoverStrokePathNV").?);
-    glPathCommandsNV = @ptrCast(@TypeOf(glPathCommandsNV), glfwGetProcAddress("glPathCommandsNV").?);
-    glPathParameteriNV = @ptrCast(@TypeOf(glPathParameteriNV), glfwGetProcAddress("glPathParameteriNV").?);
-    glPathParameterivNV = @ptrCast(@TypeOf(glPathParameterivNV), glfwGetProcAddress("glPathParameterivNV").?);
-    glPathParameterfNV = @ptrCast(@TypeOf(glPathParameterfNV), glfwGetProcAddress("glPathParameterfNV").?);
-    glPathParameterfvNV = @ptrCast(@TypeOf(glPathParameterfvNV), glfwGetProcAddress("glPathParameterfvNV").?);
     glProgramUniform1f = @ptrCast(@TypeOf(glProgramUniform1f), glfwGetProcAddress("glProgramUniform1f").?);
     glProgramUniform2f = @ptrCast(@TypeOf(glProgramUniform2f), glfwGetProcAddress("glProgramUniform2f").?);
     glProgramUniform1i = @ptrCast(@TypeOf(glProgramUniform1i), glfwGetProcAddress("glProgramUniform1i").?);
@@ -93,4 +67,6 @@ pub fn initOpenGlEntryPoints() void {
     glGetProgramiv = @ptrCast(@TypeOf(glGetProgramiv), glfwGetProcAddress("glGetProgramiv").?);
     glGetProgramInfoLog = @ptrCast(@TypeOf(glGetProgramInfoLog), glfwGetProcAddress("glGetProgramInfoLog").?);
     glBindImageTexture = @ptrCast(@TypeOf(glBindImageTexture), glfwGetProcAddress("glBindImageTexture").?);
+    glTextureBarrier = @ptrCast(@TypeOf(glTextureBarrier), glfwGetProcAddress("glTextureBarrier").?);
+    glClearTexImage = @ptrCast(@TypeOf(glClearTexImage), glfwGetProcAddress("glClearTexImage").?);
 }

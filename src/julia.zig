@@ -1,16 +1,17 @@
+const builtin = @import("builtin");
 const std = @import("std");
-const math = std.math;
 const c = @import("c.zig");
+const math = std.math;
 const comptimePrint = std.fmt.comptimePrint;
 
-const window_name = "generative art experiment 0000";
+const window_name = "quaternion julia sets";
 const window_width = 1920;
 const window_height = 1080;
-var oglppo: c.GLuint = undefined;
+var oglppo: c.GLuint = 0;
 
 // zig fmt: off
 const glsl_cs_image_a =
-\\  #version 460 compatibility
+\\  #version 460 core
 \\
 ++ "layout("
 ++ "    local_size_x = " ++ comptimePrint("{d}", .{16}) ++ ", "
@@ -42,12 +43,14 @@ const glsl_cs_image_a =
 \\  }
 \\
 \\  vec4 qSquare(vec4 q) {
-\\      return vec4(q.x * q.x - q.y * q.y - q.z * q.z - q.w * q.w, 2.0 * q.x * q.yzw);
+\\      return vec4(
+\\          q.x * q.x - q.y * q.y - q.z * q.z - q.w * q.w,
+\\          2.0 * q.x * q.yzw);
 \\  }
 \\  vec4 qMul(vec4 q0, vec4 q1) {
 \\      return vec4(
 \\          q0.x * q1.x - q0.y * q1.y - q0.z * q1.z - q0.w * q1.w,
-\\          q0.y * q1.x + q0.x * q1.y + q0.z * q1.w - q0.w * q1.z, 
+\\          q0.y * q1.x + q0.x * q1.y + q0.z * q1.w - q0.w * q1.z,
 \\          q0.z * q1.x + q0.x * q1.z + q0.w * q1.y - q0.y * q1.w,
 \\          q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y);
 \\  }
@@ -72,7 +75,7 @@ const glsl_cs_image_a =
 
 fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
     const prog = c.glCreateShaderProgramv(stype, 1, &@as([*c]const u8, glsl));
-    var status: c.GLint = undefined;
+    var status: c.GLint = 0;
     c.glGetProgramiv(prog, c.GL_LINK_STATUS, &status);
     if (status == c.GL_FALSE) {
         var log = [_]u8{0} ** 256;
@@ -89,10 +92,15 @@ pub fn main() !void {
     }
     defer c.glfwTerminate();
 
-    const xx = 16;
-    const glsl_ = std.fmt.comptimePrint("{d}", .{xx});
-    std.debug.print("{s}\n", .{glsl_});
-
+    c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, 4);
+    c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, 6);
+    c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
+    c.glfwWindowHint(c.GLFW_OPENGL_FORWARD_COMPAT, c.GL_TRUE);
+    if (builtin.mode == .ReleaseFast) {
+        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_FALSE);
+    } else {
+        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_TRUE);
+    }
     c.glfwWindowHint(c.GLFW_DEPTH_BITS, 24);
     c.glfwWindowHint(c.GLFW_STENCIL_BITS, 8);
     c.glfwWindowHint(c.GLFW_RESIZABLE, c.GLFW_FALSE);
@@ -116,10 +124,12 @@ pub fn main() !void {
     c.glCreateProgramPipelines(1, &oglppo);
     c.glBindProgramPipeline(oglppo);
 
-    c.glEnable(c.GL_DEBUG_OUTPUT);
-    c.glDebugMessageCallback(handleGlError, null);
+    if (builtin.mode != .ReleaseFast) {
+        c.glEnable(c.GL_DEBUG_OUTPUT);
+        c.glDebugMessageCallback(handleGlError, null);
+    }
 
-    var image_a: c.GLuint = undefined;
+    var image_a: c.GLuint = 0;
     c.glCreateTextures(c.GL_TEXTURE_2D, 1, &image_a);
     c.glTextureStorage2D(
         image_a,
@@ -128,12 +138,23 @@ pub fn main() !void {
         window_width,
         window_height,
     );
+    c.glClearTexImage(
+        image_a,
+        0,
+        c.GL_RGBA,
+        c.GL_FLOAT,
+        &[_]f32{ 0.0, 0.0, 0.0, 0.0 },
+    );
     defer c.glDeleteTextures(1, &image_a);
 
     const cs = createShaderProgram(c.GL_COMPUTE_SHADER, glsl_cs_image_a);
     defer c.glDeleteProgram(cs);
 
-    var frame_num: i32 = 1;
+    var fbo: c.GLuint = 0;
+    c.glCreateFramebuffers(1, &fbo);
+    defer c.glDeleteFramebuffers(1, &fbo);
+
+    var frame_num: i32 = 0;
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
@@ -160,19 +181,22 @@ pub fn main() !void {
         c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
         c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-        c.glDrawTextureNV(
-            image_a,
-            0, // sampler
-            0.0, // x
-            0.0, // y
-            @intToFloat(f32, window_width),
-            @intToFloat(f32, window_height),
-            0.0, // z
-            0.0, // s0
-            1.0, // t0
-            1.0, // s1
-            0.0, // t1
+        c.glNamedFramebufferTexture(fbo, c.GL_COLOR_ATTACHMENT0, image_a, 0);
+        c.glBlitNamedFramebuffer(
+            fbo, // src
+            0, // dst
+            0, // x0
+            0, // y0
+            window_width,
+            window_height,
+            0, // x1
+            0, // y1
+            window_width,
+            window_height,
+            c.GL_COLOR_BUFFER_BIT,
+            c.GL_NEAREST,
         );
+        c.glNamedFramebufferTexture(fbo, c.GL_COLOR_ATTACHMENT0, 0, 0);
 
         frame_num += 1;
         if (c.glGetError() != c.GL_NO_ERROR) {
