@@ -30,10 +30,12 @@ const src =
 \\
 ++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform writeonly image2D u_image;\n" ++
 \\
+\\  //#define Z2
 \\  const float k_foc_len = 3.0;
+\\  const float k_bounding_sphere_rad = 1.2;
 \\  const float k_precis = 0.00025;
-\\  const int k_num_iter = 100;
-\\  const vec4 k_c = vec4(-0.2, 0.2, 0.2, 0.6);
+\\  const int k_num_iter = 200;
+\\  const vec4 k_c = vec4(-2.0, 6.0, 15.0, -6.0) / 22.0;
 \\
 \\  int seed = 1;
 \\  void srand(int s) {
@@ -57,6 +59,12 @@ const src =
 \\          q.x * q.x - q.y * q.y - q.z * q.z - q.w * q.w,
 \\          2.0 * q.x * q.yzw);
 \\  }
+\\  vec4 qCube(vec4 q) {
+\\      vec4  q2 = q * q;
+\\      return vec4(
+\\          q.x * (q2.x - 3.0 * q2.y - 3.0 * q2.z - 3.0 * q2.w),
+\\          q.yzw * (3.0 * q2.x - q2.y - q2.z - q2.w));
+\\  }
 \\  vec4 qMul(vec4 q0, vec4 q1) {
 \\      return vec4(
 \\          q0.x * q1.x - q0.y * q1.y - q0.z * q1.z - q0.w * q1.w,
@@ -64,8 +72,22 @@ const src =
 \\          q0.z * q1.x + q0.x * q1.z + q0.w * q1.y - q0.y * q1.w,
 \\          q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y);
 \\  }
+\\  float qLength2(vec4 q) {
+\\      return dot(q, q);
+\\  }
+\\
+\\  vec2 intersectSphere(vec3 ro, vec3 rd, float rad) {
+\\      float b = dot(ro, rd);
+\\      float c = dot(ro, ro) - rad * rad;
+\\      float h = b * b - c;
+\\      if (h < 0.0) return vec2(-1.0);
+\\      h = sqrt(h);
+\\      return vec2(-b -h, -b + h);
+\\  }
 \\
 \\  vec2 map(vec3 p) {
+\\      #ifdef Z2 // z^2 + c
+\\
 \\      vec4 z = vec4(p, 0.0);
 \\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      float m2 = 0.0;
@@ -73,30 +95,73 @@ const src =
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
 \\          z = qSquare(z) + k_c;
-\\          m2 = dot(z, z);
-\\          if (m2 > 10.0) {
+\\          m2 = qLength2(z);
+\\          if (m2 > 256.0) {
 \\              break;
 \\          }
 \\          n += 1.0;
 \\      }
 \\      float m = sqrt(m2);
 \\      return vec2(0.5 * m * log(m) / length(zp), n);
+\\
+\\      #else // z^3 + c
+\\
+\\      vec4 z = vec4(p, 0.0);
+\\      float dz2 = 1.0;
+\\      float m2 = 0.0;
+\\      float n = 0.0;
+\\      for (int i = 0; i < k_num_iter; ++i) {
+\\          dz2 *= 9.0 * qLength2(qSquare(z));
+\\          z = qCube(z) + k_c;
+\\          m2 = qLength2(z);
+\\          if (m2 > 256.0) {
+\\              break;
+\\          }
+\\          n += 1.0;
+\\      }
+\\      return vec2(0.25 * log(m2) * sqrt(m2 / dz2), n);
+\\
+\\      #endif // #ifdef Z2
 \\  }
 \\
-\\  vec2 raycast(vec3 ro, vec3 rd) {
-\\      vec2 res;
-\\      float t = 0.001;
+\\  vec2 castRay(vec3 ro, vec3 rd) {
+\\      float tmax = 7.0;
+\\      float tmin = k_precis;
+\\
+\\      #if 1
+\\      {
+\\          float tp_f = (-0.8 - ro.y) / rd.y;
+\\          if (tp_f > 0.0) tmax = min(tmax, tp_f);
+\\      }
+\\      #endif
+\\
+\\      #if 1
+\\      {
+\\          vec2 bv = intersectSphere(ro, rd, k_bounding_sphere_rad);
+\\          if (bv.y < 0.0) return vec2(-2.0, 0.0);
+\\          tmin = max(tmin, bv.x);
+\\          tmax = min(tmax, bv.y);
+\\      }
+\\      #endif
+\\
+\\      vec2 res = vec2(-1.0);
+\\      float t = tmin;
+\\      float lt = 0.0;
+\\      float lh = 0.0;
 \\      for (int i = 0; i < 1024; ++i) {
 \\          res = map(ro + rd * t);
 \\          if (res.x < k_precis) {
 \\              break;
 \\          }
+\\          lt = t;
+\\          lh = res.x;
 \\          t += min(res.x, 0.2);
-\\          if (t > 256.0) {
+\\          if (t > tmax) {
 \\              break;
 \\          }
 \\      }
-\\      res.x = (t < 10.0) ? t : -1.0;
+\\      if (lt > 0.0001 && res.x < 0.0) t = lt - lh * (t - lt) / (res.x - lh);
+\\      res.x = (t < tmax) ? t : -1.0;
 \\      return res;
 \\  }
 \\
@@ -109,16 +174,27 @@ const src =
 \\          e.xxx * map(pos + e.xxx).x);
 \\  }
 \\
+\\  vec3 colorSurface(vec3 pos, vec3 nor, vec2 tn) {
+\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 +vec3(0.0, 0.6, 1.0));
+\\      if (pos.y > 0.0) col = mix(col, vec3(1.0), 0.2);
+\\      float inside = smoothstep(14.0, 15.0, tn.y);
+\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
+\\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
+\\      col = mix(mix(col, vec3(dot(col, vec3(0.3333))), -0.4), col, inside);
+\\      return clamp(col * 0.65, 0.0, 1.0);
+\\  }
+\\
 \\  vec3 render(vec2 fragcoord, vec3 ro, vec3 rd, out vec3 out_pos, out float out_t) {
 \\      vec3 color_mask = vec3(1.0);
 \\      out_t = 1e20;
-\\      vec2 tn = raycast(ro, rd);
+\\      vec2 tn = castRay(ro, rd);
 \\      if (tn.x < 0.0) {
 \\          return vec3(0.0);
 \\      }
 \\      vec3 pos = ro + rd * tn.x;
 \\      vec3 nor = calcNormal(pos);
-\\      return color_mask * abs(nor);
+\\      color_mask = colorSurface(pos, nor, tn);
+\\      return color_mask;
 \\  }
 \\
 \\  void main() {
