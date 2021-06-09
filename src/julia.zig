@@ -31,8 +31,14 @@ const src =
 ++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
 \\  //#define Z2
+\\  #define TRAPS
+\\
 \\  const float k_foc_len = 3.0;
+\\  #ifdef TRAPS
+\\  const float k_bounding_sphere_rad = 2.0;
+\\  #else
 \\  const float k_bounding_sphere_rad = 1.2;
+\\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
 \\  const vec4 k_c = vec4(-2.0, 6.0, 15.0, -6.0) / 22.0;
@@ -100,42 +106,55 @@ const src =
 \\  }
 \\
 \\  vec2 map(vec3 p) {
-\\      #ifdef Z2 // z^2 + c
-\\
 \\      vec4 z = vec4(p, 0.0);
-\\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      float m2 = 0.0;
 \\      float n = 0.0;
+\\      #ifdef TRAPS
+\\      float trap_dist = 1e10;
+\\      #endif
+\\
+\\      #ifdef Z2 // z^2 + c
+\\
+\\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
 \\          z = qSquare(z) + k_c;
 \\          m2 = qLength2(z);
+\\          #ifdef TRAPS
+\\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
+\\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
 \\          }
 \\          n += 1.0;
 \\      }
 \\      float m = sqrt(m2);
-\\      return vec2(0.5 * m * log(m) / length(zp), n);
+\\      float dist = 0.5 * m * log(m) / length(zp);
 \\
 \\      #else // z^3 + c
 \\
-\\      vec4 z = vec4(p, 0.0);
 \\      float dz2 = 1.0;
-\\      float m2 = 0.0;
-\\      float n = 0.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
 \\          z = qCube(z) + k_c;
 \\          m2 = qLength2(z);
+\\          #ifdef TRAPS
+\\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
+\\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
 \\          }
 \\          n += 1.0;
 \\      }
-\\      return vec2(0.25 * log(m2) * sqrt(m2 / dz2), n);
+\\      float dist = 0.25 * log(m2) * sqrt(m2 / dz2);
 \\
 \\      #endif // #ifdef Z2
+\\
+\\      #ifdef TRAPS
+\\      dist = min(dist, trap_dist);
+\\      #endif
+\\
+\\      return vec2(dist, n);
 \\  }
 \\
 \\  vec2 castRay(vec3 ro, vec3 rd) {
@@ -169,7 +188,11 @@ const src =
 \\          }
 \\          lt = t;
 \\          lh = res.x;
+\\          #ifndef TRAPS
 \\          t += min(res.x, 0.2);
+\\          #else
+\\          t += min(res.x, 0.01) * (0.5 + 0.5 * frand());
+\\          #endif
 \\          if (t > tmax) {
 \\              break;
 \\          }
@@ -226,7 +249,7 @@ const src =
 \\
 \\      vec2 fragcoord = q + vec2(0.5);
 \\
-\\      float an = 0.5 + u_time * 0.03;
+\\      float an = 0.5 + u_time * 0.02;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\      vec3 ta = vec3(0.0, -0.1, 0.0);
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
