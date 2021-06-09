@@ -82,10 +82,10 @@ const src =
 \\      float h = b * b - c;
 \\      if (h < 0.0) return vec2(-1.0);
 \\      h = sqrt(h);
-\\      return vec2(-b -h, -b + h);
+\\      return vec2(-b - h, -b + h);
 \\  }
 \\
-\\  vec3 calcDirection(vec3 nor) {
+\\  vec3 calcBounceDirection(vec3 nor) {
 \\      float u = frand() * 2.0 - 1.0;
 \\      float a = frand() * 6.28318531;
 \\      return normalize(nor + vec3(sqrt(1.0 -u * u) * vec2(cos(a), sin(a)), u));
@@ -210,7 +210,7 @@ const src =
 \\              vec3 pos = ro + rd * t;
 \\              vec3 nor = calcNormal(pos);
 \\              color_mask *= calcSurfaceColor(pos, nor, tn);
-\\              rd = calcDirection(nor);
+\\              rd = calcBounceDirection(nor);
 \\              ro = pos + nor * k_precis;
 \\          }
 \\      }
