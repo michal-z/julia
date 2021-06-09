@@ -60,7 +60,7 @@ const src =
 \\          2.0 * q.x * q.yzw);
 \\  }
 \\  vec4 qCube(vec4 q) {
-\\      vec4  q2 = q * q;
+\\      vec4 q2 = q * q;
 \\      return vec4(
 \\          q.x * (q2.x - 3.0 * q2.y - 3.0 * q2.z - 3.0 * q2.w),
 \\          q.yzw * (3.0 * q2.x - q2.y - q2.z - q2.w));
@@ -88,7 +88,7 @@ const src =
 \\  vec3 calcBounceDirection(vec3 nor) {
 \\      float u = frand() * 2.0 - 1.0;
 \\      float a = frand() * 6.28318531;
-\\      return normalize(nor + vec3(sqrt(1.0 -u * u) * vec2(cos(a), sin(a)), u));
+\\      return normalize(nor + vec3(sqrt(1.0 - u * u) * vec2(cos(a), sin(a)), u));
 \\  }
 \\
 \\  mat3 setCamera(vec3 ro, vec3 ta, float cr) {
