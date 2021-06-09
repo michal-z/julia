@@ -28,7 +28,7 @@ const src =
 ++ "layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n"
 ++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
 \\
-++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform writeonly image2D u_image;\n" ++
+++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
 \\  //#define Z2
 \\  const float k_foc_len = 3.0;
@@ -188,7 +188,7 @@ const src =
 \\          e.xxx * map(pos + e.xxx).x);
 \\  }
 \\
-\\  vec3 colorSurface(vec3 pos, vec3 nor, vec2 tn) {
+\\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
 \\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(0.0, 0.6, 1.0));
 \\      if (pos.y > 0.0) col = mix(col, vec3(1.0), 0.2);
 \\      float inside = smoothstep(14.0, 15.0, tn.y);
@@ -210,7 +210,7 @@ const src =
 \\          } else {
 \\              vec3 pos = ro + rd * t;
 \\              vec3 nor = calcNormal(pos);
-\\              color_mask *= colorSurface(pos, nor, tn);
+\\              color_mask *= calcSurfaceColor(pos, nor, tn);
 \\              rd = calcDirection(nor);
 \\              ro = pos + nor * k_precis;
 \\          }
@@ -239,8 +239,8 @@ const src =
 \\      float res_t;
 \\      vec3 col = render(fragcoord, ro, rd, pos, res_t);
 \\
-\\      vec4 color = vec4(col, u_time);
-\\      imageStore(u_image, q, color);
+\\      vec3 old_col = imageLoad(u_image, q).rgb;
+\\      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.06));
 \\  }
 ;};
 // zig fmt: on
@@ -345,7 +345,7 @@ pub fn main() !void {
             0, // level
             c.GL_FALSE, // layered
             0, // layer
-            c.GL_WRITE_ONLY,
+            c.GL_READ_WRITE,
             c.GL_RGBA32F,
         );
         c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs);
