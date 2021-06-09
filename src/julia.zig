@@ -32,6 +32,7 @@ const src =
 \\
 \\  //#define Z2
 \\  #define TRAPS
+\\  #define CUT
 \\
 \\  const float k_foc_len = 3.0;
 \\  #ifdef TRAPS
@@ -154,6 +155,9 @@ const src =
 \\      #ifdef TRAPS
 \\      dist = min(dist, trap_dist);
 \\      #endif
+\\      #ifdef CUT
+\\      dist = max(dist, p.y);
+\\      #endif
 \\
 \\      return vec2(dist, n);
 \\  }
@@ -161,6 +165,17 @@ const src =
 \\  vec2 castRay(vec3 ro, vec3 rd) {
 \\      float tmax = 7.0;
 \\      float tmin = k_precis;
+\\
+\\      #ifdef CUT
+\\      {
+\\          const float k_split = 0.01;
+\\          float tp_s = (k_split - ro.y) / rd.y;
+\\          if (tp_s > 0.0) {
+\\              if (ro.y > k_split) tmin = max(tmin, tp_s);
+\\              else tmax = min(tmax, tp_s);
+\\          }
+\\      }
+\\      #endif
 \\
 \\      #if 1
 \\      {
@@ -252,7 +267,12 @@ const src =
 \\
 \\      float an = 0.5 + u_time * 0.01;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
+\\
+\\      #ifdef CUT
+\\      vec3 ta = vec3(0.0, -0.3, 0.0);
+\\      #else
 \\      vec3 ta = vec3(0.0, -0.1, 0.0);
+\\      #endif
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
 \\
 \\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
