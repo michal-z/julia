@@ -41,6 +41,7 @@ const src =
 \\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
+\\  const int k_num_bounces = 3;
 \\  const vec4 k_c = vec4(-2.0, 6.0, 15.0, -6.0) / 22.0;
 \\
 \\  int seed = 1;
@@ -224,7 +225,7 @@ const src =
 \\  vec3 render(vec3 ro, vec3 rd) {
 \\      vec3 color_mask = vec3(1.0);
 \\
-\\      for (int bounce = 0; bounce < 3; ++bounce) {
+\\      for (int bounce = 0; bounce < k_num_bounces; ++bounce) {
 \\          vec2 tn = castRay(ro, rd);
 \\          float t = tn.x;
 \\          if (t < 0.0) {
@@ -242,14 +243,14 @@ const src =
 \\
 \\  void main() {
 \\      ivec2 q = ivec2(gl_GlobalInvocationID);
-\\      if (q.x >= int(u_resolution.x) || q.y > int(u_resolution.y)) {
+\\      if (q.x >= int(u_resolution.x) || q.y >= int(u_resolution.y)) {
 \\          return;
 \\      }
 \\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
 \\
 \\      vec2 fragcoord = q + vec2(0.5);
 \\
-\\      float an = 0.5 + u_time * 0.02;
+\\      float an = 0.5 + u_time * 0.01;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\      vec3 ta = vec3(0.0, -0.1, 0.0);
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
