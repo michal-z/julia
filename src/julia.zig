@@ -198,9 +198,8 @@ const src =
 \\      return clamp(col * 0.65, 0.0, 1.0);
 \\  }
 \\
-\\  vec3 render(vec2 fragcoord, vec3 ro, vec3 rd, out vec3 out_pos, out float out_t) {
+\\  vec3 render(vec3 ro, vec3 rd) {
 \\      vec3 color_mask = vec3(1.0);
-\\      out_t = 1e20;
 \\
 \\      for (int bounce = 0; bounce < 3; ++bounce) {
 \\          vec2 tn = castRay(ro, rd);
@@ -235,9 +234,7 @@ const src =
 \\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
 \\      vec3 rd = normalize(cam * vec3(p, k_foc_len));
 \\
-\\      vec3 pos;
-\\      float res_t;
-\\      vec3 col = render(fragcoord, ro, rd, pos, res_t);
+\\      vec3 col = render(ro, rd);
 \\
 \\      vec3 old_col = imageLoad(u_image, q).rgb;
 \\      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.06));
