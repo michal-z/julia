@@ -423,6 +423,16 @@ pub fn main() !void {
 
     var fractal_c = [4]f32{ -2.0 / 22.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 };
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const leaked = gpa.deinit();
+        std.debug.assert(leaked == false);
+    }
+
+    var image_data = try std.ArrayList(u8).initCapacity(&gpa.allocator, window_width * window_height * 3);
+    try image_data.resize(window_width * window_height * 3);
+    defer image_data.deinit();
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
 
@@ -466,6 +476,11 @@ pub fn main() !void {
         c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
         c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
         c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+
+        if (frame_num == 100) {
+            c.glReadPixels(0, 0, window_width, window_height, c.GL_RGB, c.GL_UNSIGNED_BYTE, image_data.items.ptr);
+            _ = c.stbi_write_png("frame_0000.png", window_width, window_height, 3, image_data.items.ptr, window_width * 3);
+        }
 
         frame_num += 1;
         if (c.glGetError() != c.GL_NO_ERROR) {
