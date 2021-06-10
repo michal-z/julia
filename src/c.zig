@@ -38,6 +38,11 @@ pub var glClearTexImage: @typeInfo(PFNGLCLEARTEXIMAGEPROC).Optional.child = unde
 pub var glEnable: @typeInfo(PFNGLENABLEPROC).Optional.child = undefined;
 pub var glGetError: @typeInfo(PFNGLGETERRORPROC).Optional.child = undefined;
 pub var glDeleteTextures: @typeInfo(PFNGLDELETETEXTURESPROC).Optional.child = undefined;
+pub var glBindTextureUnit: @typeInfo(PFNGLBINDTEXTUREUNITPROC).Optional.child = undefined;
+pub var glDrawArrays: @typeInfo(PFNGLDRAWARRAYSPROC).Optional.child = undefined;
+pub var glCreateVertexArrays: @typeInfo(PFNGLCREATEVERTEXARRAYSPROC).Optional.child = undefined;
+pub var glDeleteVertexArrays: @typeInfo(PFNGLDELETEVERTEXARRAYSPROC).Optional.child = undefined;
+pub var glBindVertexArray: @typeInfo(PFNGLBINDVERTEXARRAYPROC).Optional.child = undefined;
 
 pub fn initOpenGlEntryPoints() void {
     glCreateTextures = @ptrCast(@TypeOf(glCreateTextures), glfwGetProcAddress("glCreateTextures").?);
@@ -75,4 +80,9 @@ pub fn initOpenGlEntryPoints() void {
     glEnable = @ptrCast(@TypeOf(glEnable), glfwGetProcAddress("glEnable").?);
     glGetError = @ptrCast(@TypeOf(glGetError), glfwGetProcAddress("glGetError").?);
     glDeleteTextures = @ptrCast(@TypeOf(glDeleteTextures), glfwGetProcAddress("glDeleteTextures").?);
+    glBindTextureUnit = @ptrCast(@TypeOf(glBindTextureUnit), glfwGetProcAddress("glBindTextureUnit").?);
+    glDrawArrays = @ptrCast(@TypeOf(glDrawArrays), glfwGetProcAddress("glDrawArrays").?);
+    glCreateVertexArrays = @ptrCast(@TypeOf(glCreateVertexArrays), glfwGetProcAddress("glCreateVertexArrays").?);
+    glDeleteVertexArrays = @ptrCast(@TypeOf(glDeleteVertexArrays), glfwGetProcAddress("glDeleteVertexArrays").?);
+    glBindVertexArray = @ptrCast(@TypeOf(glBindVertexArray), glfwGetProcAddress("glBindVertexArray").?);
 }

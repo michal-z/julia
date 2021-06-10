@@ -11,6 +11,7 @@ var oglppo: c.GLuint = 0;
 
 // zig fmt: off
 const cs_image_a = struct {
+var name: c.GLuint = 0;
 const group_size_x = 8;
 const group_size_y = 8;
 const frame_loc = 0;
@@ -30,7 +31,7 @@ const src =
 \\
 ++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
-\\  //#define Z2
+\\  #define Z2
 \\  #define TRAPS
 \\  //#define CUT
 \\
@@ -286,6 +287,51 @@ const src =
 ;};
 // zig fmt: on
 
+// zig fmt: off
+const vs_full_tri = struct {
+var name: c.GLuint = 0;
+const src =
+\\  #version 460 core
+\\
+\\  out gl_PerVertex {
+\\      vec4 gl_Position;
+\\  };
+\\
+\\  void main() {
+\\      const vec2 positions[] = { vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0) };
+\\      gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+\\  }
+;};
+// zig fmt: on
+
+// zig fmt: off
+const fs_image = struct {
+var name: c.GLuint = 0;
+const resolution_loc = 0;
+const image_unit = 0;
+const src =
+\\  #version 460 core
+\\
+++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n"
+++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
+\\
+\\  layout(location = 0) out vec4 o_color;
+\\
+\\  void main() {
+\\      vec2 p = vec2(gl_FragCoord) / u_resolution;
+\\      vec3 col = textureLod(u_image, p, 0.0).rgb;
+\\      col = 2.0 * col / (col + 1.0);
+\\      col = pow(col, vec3(0.4545));
+\\      col = pow(col, vec3(0.85, 0.97, 1.0));
+\\      col = 0.5 * col + 0.5 * col * col * (3.0 - 2.0 * col);
+\\
+\\      col *= 0.5 + 0.5 * pow(16.0 * p.x * p.y * (1.0 - p.x) * (1.0 - p.y), 0.1);
+\\
+\\      o_color = vec4(col, 1.0);
+\\  }
+;};
+// zig fmt: on
+
 fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
     const prog = c.glCreateShaderProgramv(stype, 1, &@as([*c]const u8, glsl));
     var status: c.GLint = 0;
@@ -360,22 +406,29 @@ pub fn main() !void {
     );
     defer c.glDeleteTextures(1, &image_a);
 
-    const cs = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src);
-    defer c.glDeleteProgram(cs);
+    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src);
+    defer c.glDeleteProgram(cs_image_a.name);
 
-    var fbo: c.GLuint = 0;
-    c.glCreateFramebuffers(1, &fbo);
-    defer c.glDeleteFramebuffers(1, &fbo);
+    vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src);
+    defer c.glDeleteProgram(vs_full_tri.name);
+
+    fs_image.name = createShaderProgram(c.GL_FRAGMENT_SHADER, fs_image.src);
+    defer c.glDeleteProgram(fs_image.name);
+
+    var vao: c.GLuint = 0;
+    c.glCreateVertexArrays(1, &vao);
+    defer c.glDeleteVertexArrays(1, &vao);
+    c.glBindVertexArray(vao);
 
     var frame_num: i32 = 0;
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
 
-        c.glProgramUniform1i(cs, cs_image_a.frame_loc, frame_num);
-        c.glProgramUniform1f(cs, cs_image_a.time_loc, @floatCast(f32, stats.time));
+        c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
+        c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, @floatCast(f32, stats.time));
         c.glProgramUniform2f(
-            cs,
+            cs_image_a.name,
             cs_image_a.resolution_loc,
             @intToFloat(f32, window_width),
             @intToFloat(f32, window_height),
@@ -389,7 +442,7 @@ pub fn main() !void {
             c.GL_READ_WRITE,
             c.GL_RGBA32F,
         );
-        c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs);
+        c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs_image_a.name);
         c.glDispatchCompute(
             (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
             (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
@@ -398,22 +451,17 @@ pub fn main() !void {
         c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
         c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-        c.glNamedFramebufferTexture(fbo, c.GL_COLOR_ATTACHMENT0, image_a, 0);
-        c.glBlitNamedFramebuffer(
-            fbo, // src
-            0, // dst
-            0, // x0
-            0, // y0
-            window_width,
-            window_height,
-            0, // x1
-            0, // y1
-            window_width,
-            window_height,
-            c.GL_COLOR_BUFFER_BIT,
-            c.GL_NEAREST,
+        c.glProgramUniform2f(
+            fs_image.name,
+            fs_image.resolution_loc,
+            @intToFloat(f32, window_width),
+            @intToFloat(f32, window_height),
         );
-        c.glNamedFramebufferTexture(fbo, c.GL_COLOR_ATTACHMENT0, 0, 0);
+        c.glBindTextureUnit(fs_image.image_unit, image_a);
+        c.glUseProgramStages(oglppo, c.GL_VERTEX_SHADER_BIT, vs_full_tri.name);
+        c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
+        c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
+        c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
 
         frame_num += 1;
         if (c.glGetError() != c.GL_NO_ERROR) {
