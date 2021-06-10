@@ -32,7 +32,7 @@ const src =
 \\
 \\  //#define Z2
 \\  #define TRAPS
-\\  #define CUT
+\\  //#define CUT
 \\
 \\  const float k_foc_len = 3.0;
 \\  #ifdef TRAPS

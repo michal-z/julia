@@ -1,5 +1,5 @@
 pub usingnamespace @cImport({
-    @cDefine("GLFW_INCLUDE_GLEXT", "");
+    @cDefine("GLFW_INCLUDE_GLCOREARB", "");
     @cInclude("GLFW/glfw3.h");
 });
 
@@ -35,6 +35,9 @@ pub var glGetProgramInfoLog: @typeInfo(PFNGLGETPROGRAMINFOLOGPROC).Optional.chil
 pub var glBindImageTexture: @typeInfo(PFNGLBINDIMAGETEXTUREPROC).Optional.child = undefined;
 pub var glTextureBarrier: @typeInfo(PFNGLTEXTUREBARRIERPROC).Optional.child = undefined;
 pub var glClearTexImage: @typeInfo(PFNGLCLEARTEXIMAGEPROC).Optional.child = undefined;
+pub var glEnable: @typeInfo(PFNGLENABLEPROC).Optional.child = undefined;
+pub var glGetError: @typeInfo(PFNGLGETERRORPROC).Optional.child = undefined;
+pub var glDeleteTextures: @typeInfo(PFNGLDELETETEXTURESPROC).Optional.child = undefined;
 
 pub fn initOpenGlEntryPoints() void {
     glCreateTextures = @ptrCast(@TypeOf(glCreateTextures), glfwGetProcAddress("glCreateTextures").?);
@@ -69,4 +72,7 @@ pub fn initOpenGlEntryPoints() void {
     glBindImageTexture = @ptrCast(@TypeOf(glBindImageTexture), glfwGetProcAddress("glBindImageTexture").?);
     glTextureBarrier = @ptrCast(@TypeOf(glTextureBarrier), glfwGetProcAddress("glTextureBarrier").?);
     glClearTexImage = @ptrCast(@TypeOf(glClearTexImage), glfwGetProcAddress("glClearTexImage").?);
+    glEnable = @ptrCast(@TypeOf(glEnable), glfwGetProcAddress("glEnable").?);
+    glGetError = @ptrCast(@TypeOf(glGetError), glfwGetProcAddress("glGetError").?);
+    glDeleteTextures = @ptrCast(@TypeOf(glDeleteTextures), glfwGetProcAddress("glDeleteTextures").?);
 }
