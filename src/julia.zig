@@ -320,12 +320,10 @@ const src =
 \\  void main() {
 \\      vec2 p = vec2(gl_FragCoord) / u_resolution;
 \\      vec3 col = textureLod(u_image, p, 0.0).rgb;
-\\      col = 2.0 * col / (col + 1.0);
+\\
 \\      col = pow(col, vec3(0.4545));
 \\      col = pow(col, vec3(0.85, 0.97, 1.0));
 \\      col = 0.5 * col + 0.5 * col * col * (3.0 - 2.0 * col);
-\\
-\\      col *= 0.5 + 0.5 * pow(16.0 * p.x * p.y * (1.0 - p.x) * (1.0 - p.y), 0.1);
 \\
 \\      o_color = vec4(col, 1.0);
 \\  }
