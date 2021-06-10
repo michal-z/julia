@@ -1,6 +1,7 @@
 pub usingnamespace @cImport({
     @cDefine("GLFW_INCLUDE_GLCOREARB", "");
     @cInclude("GLFW/glfw3.h");
+    @cInclude("stb_image_write.h");
 });
 
 pub var glCreateTextures: @typeInfo(PFNGLCREATETEXTURESPROC).Optional.child = undefined;
@@ -26,6 +27,7 @@ pub var glCreateProgramPipelines: @typeInfo(PFNGLCREATEPROGRAMPIPELINESPROC).Opt
 pub var glBindProgramPipeline: @typeInfo(PFNGLBINDPROGRAMPIPELINEPROC).Optional.child = undefined;
 pub var glProgramUniform1f: @typeInfo(PFNGLPROGRAMUNIFORM1FPROC).Optional.child = undefined;
 pub var glProgramUniform2f: @typeInfo(PFNGLPROGRAMUNIFORM2FPROC).Optional.child = undefined;
+pub var glProgramUniform4fv: @typeInfo(PFNGLPROGRAMUNIFORM4FVPROC).Optional.child = undefined;
 pub var glProgramUniform1i: @typeInfo(PFNGLPROGRAMUNIFORM1IPROC).Optional.child = undefined;
 pub var glProgramUniform2i: @typeInfo(PFNGLPROGRAMUNIFORM2IPROC).Optional.child = undefined;
 pub var glMemoryBarrier: @typeInfo(PFNGLMEMORYBARRIERPROC).Optional.child = undefined;
@@ -68,6 +70,7 @@ pub fn initOpenGlEntryPoints() void {
     glBindProgramPipeline = @ptrCast(@TypeOf(glBindProgramPipeline), glfwGetProcAddress("glBindProgramPipeline").?);
     glProgramUniform1f = @ptrCast(@TypeOf(glProgramUniform1f), glfwGetProcAddress("glProgramUniform1f").?);
     glProgramUniform2f = @ptrCast(@TypeOf(glProgramUniform2f), glfwGetProcAddress("glProgramUniform2f").?);
+    glProgramUniform4fv = @ptrCast(@TypeOf(glProgramUniform4fv), glfwGetProcAddress("glProgramUniform4fv").?);
     glProgramUniform1i = @ptrCast(@TypeOf(glProgramUniform1i), glfwGetProcAddress("glProgramUniform1i").?);
     glProgramUniform2i = @ptrCast(@TypeOf(glProgramUniform2i), glfwGetProcAddress("glProgramUniform2i").?);
     glMemoryBarrier = @ptrCast(@TypeOf(glMemoryBarrier), glfwGetProcAddress("glMemoryBarrier").?);

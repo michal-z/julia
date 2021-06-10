@@ -32,6 +32,8 @@ pub fn build(b: *std.build.Builder) void {
     }
     exe.addIncludeDir("c/glfw-3.3.4/include");
 
+    exe.addCSourceFile("c/stb_image_write.c", &[_][]const u8{"-std=c99"});
+
     exe.addIncludeDir("c");
 
     exe.linkSystemLibrary("user32");

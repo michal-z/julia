@@ -17,6 +17,7 @@ const group_size_y = 8;
 const frame_loc = 0;
 const time_loc = 1;
 const resolution_loc = 2;
+const fractal_c_loc = 3;
 const image_unit = 0;
 const src =
 \\  #version 460 core
@@ -27,7 +28,8 @@ const src =
 \\
 ++ "layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n"
 ++ "layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n"
+++ "layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
 \\
 ++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
@@ -44,7 +46,6 @@ const src =
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
 \\  const int k_num_bounces = 3;
-\\  const vec4 k_c = vec4(-2.0, 6.0, 15.0, -6.0) / 22.0;
 \\
 \\  int seed = 1;
 \\  void srand(int s) {
@@ -121,7 +122,7 @@ const src =
 \\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
-\\          z = qSquare(z) + k_c;
+\\          z = qSquare(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
@@ -139,7 +140,7 @@ const src =
 \\      float dz2 = 1.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
-\\          z = qCube(z) + k_c;
+\\          z = qCube(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
@@ -266,7 +267,7 @@ const src =
 \\
 \\      vec2 fragcoord = q + vec2(0.5);
 \\
-\\      float an = 0.5 + u_time * 0.01;
+\\      float an = 0.5;// + u_time * 0.01;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\
 \\      #ifdef CUT
@@ -420,8 +421,12 @@ pub fn main() !void {
 
     var frame_num: i32 = 0;
 
+    var fractal_c = [4]f32{ -2.0 / 22.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 };
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
+
+        fractal_c[2] = math.sin(@floatCast(f32, 0.05 * stats.time));
 
         c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
         c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, @floatCast(f32, stats.time));
@@ -431,6 +436,7 @@ pub fn main() !void {
             @intToFloat(f32, window_width),
             @intToFloat(f32, window_height),
         );
+        c.glProgramUniform4fv(cs_image_a.name, cs_image_a.fractal_c_loc, 1, &fractal_c);
         c.glBindImageTexture(
             cs_image_a.image_unit,
             image_a,
