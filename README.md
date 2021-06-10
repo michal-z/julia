@@ -1,6 +1,4 @@
-# julia
-
-quaternion julia sets
+# quaternion julia sets
 
 on windows: zig build run
 
