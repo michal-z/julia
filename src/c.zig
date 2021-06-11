@@ -46,6 +46,7 @@ pub var glCreateVertexArrays: @typeInfo(PFNGLCREATEVERTEXARRAYSPROC).Optional.ch
 pub var glDeleteVertexArrays: @typeInfo(PFNGLDELETEVERTEXARRAYSPROC).Optional.child = undefined;
 pub var glBindVertexArray: @typeInfo(PFNGLBINDVERTEXARRAYPROC).Optional.child = undefined;
 pub var glReadPixels: @typeInfo(PFNGLREADPIXELSPROC).Optional.child = undefined;
+pub var glFinish: @typeInfo(PFNGLFINISHPROC).Optional.child = undefined;
 
 pub fn initOpenGlEntryPoints() void {
     glCreateTextures = @ptrCast(@TypeOf(glCreateTextures), glfwGetProcAddress("glCreateTextures").?);
@@ -90,4 +91,5 @@ pub fn initOpenGlEntryPoints() void {
     glDeleteVertexArrays = @ptrCast(@TypeOf(glDeleteVertexArrays), glfwGetProcAddress("glDeleteVertexArrays").?);
     glBindVertexArray = @ptrCast(@TypeOf(glBindVertexArray), glfwGetProcAddress("glBindVertexArray").?);
     glReadPixels = @ptrCast(@TypeOf(glReadPixels), glfwGetProcAddress("glReadPixels").?);
+    glFinish = @ptrCast(@TypeOf(glFinish), glfwGetProcAddress("glFinish").?);
 }

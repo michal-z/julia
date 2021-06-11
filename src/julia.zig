@@ -45,7 +45,7 @@ const src =
 \\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
-\\  const int k_num_bounces = 3;
+\\  const int k_num_bounces = 8;
 \\
 \\  int seed = 1;
 \\  void srand(int s) {
@@ -265,8 +265,6 @@ const src =
 \\      }
 \\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
 \\
-\\      vec2 fragcoord = q + vec2(0.5);
-\\
 \\      float an = 0.5;// + u_time * 0.01;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\
@@ -277,13 +275,17 @@ const src =
 \\      #endif
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
 \\
-\\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
-\\      vec3 rd = normalize(cam * vec3(p, k_foc_len));
+\\      //for (int i = 0; i < 4; ++i) {
+\\          vec2 fragcoord = q + vec2(frand(), frand());
 \\
-\\      vec3 col = render(ro, rd);
+\\          vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
+\\          vec3 rd = normalize(cam * vec3(p, k_foc_len));
 \\
-\\      vec3 old_col = imageLoad(u_image, q).rgb;
-\\      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.06));
+\\          vec3 col = render(ro, rd);
+\\
+\\          vec3 old_col = imageLoad(u_image, q).rgb;
+\\          imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.05));
+\\      //}
 \\  }
 ;};
 // zig fmt: on
@@ -343,6 +345,47 @@ fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
     return prog;
 }
 
+fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint) void {
+    c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
+    c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, time);
+    c.glProgramUniform2f(
+        cs_image_a.name,
+        cs_image_a.resolution_loc,
+        @intToFloat(f32, window_width),
+        @intToFloat(f32, window_height),
+    );
+    c.glProgramUniform4fv(cs_image_a.name, cs_image_a.fractal_c_loc, 1, &fractal_c);
+    c.glBindImageTexture(
+        cs_image_a.image_unit,
+        image_a,
+        0, // level
+        c.GL_FALSE, // layered
+        0, // layer
+        c.GL_READ_WRITE,
+        c.GL_RGBA32F,
+    );
+    c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs_image_a.name);
+    c.glDispatchCompute(
+        (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
+        (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
+        1,
+    );
+    c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+    c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    c.glProgramUniform2f(
+        fs_image.name,
+        fs_image.resolution_loc,
+        @intToFloat(f32, window_width),
+        @intToFloat(f32, window_height),
+    );
+    c.glBindTextureUnit(fs_image.image_unit, image_a);
+    c.glUseProgramStages(oglppo, c.GL_VERTEX_SHADER_BIT, vs_full_tri.name);
+    c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
+    c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
+    c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+}
+
 pub fn main() !void {
     _ = c.glfwSetErrorCallback(handleGlfwError);
     if (c.glfwInit() == c.GLFW_FALSE) {
@@ -355,9 +398,9 @@ pub fn main() !void {
     c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
     c.glfwWindowHint(c.GLFW_OPENGL_FORWARD_COMPAT, c.GL_TRUE);
     if (builtin.mode == .ReleaseFast) {
-        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_FALSE);
+        //c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_FALSE);
     } else {
-        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_TRUE);
+        //c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_TRUE);
     }
     c.glfwWindowHint(c.GLFW_DEPTH_BITS, 24);
     c.glfwWindowHint(c.GLFW_STENCIL_BITS, 8);
@@ -383,7 +426,7 @@ pub fn main() !void {
     c.glBindProgramPipeline(oglppo);
 
     if (builtin.mode != .ReleaseFast) {
-        c.glEnable(c.GL_DEBUG_OUTPUT);
+        //c.glEnable(c.GL_DEBUG_OUTPUT);
         c.glDebugMessageCallback(handleGlError, null);
     }
 
@@ -419,8 +462,6 @@ pub fn main() !void {
     defer c.glDeleteVertexArrays(1, &vao);
     c.glBindVertexArray(vao);
 
-    var frame_num: i32 = 0;
-
     var fractal_c = [4]f32{ -2.0 / 22.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 };
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -433,56 +474,62 @@ pub fn main() !void {
     try image_data.resize(window_width * window_height * 3);
     defer image_data.deinit();
 
+    var frame_num: i32 = 0;
+    var image_num: i32 = 0;
+    var time: f32 = 0.0;
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
 
-        fractal_c[2] = math.sin(@floatCast(f32, 0.05 * stats.time));
+        fractal_c[2] = 0.5 + 0.5 * math.sin(0.1 * time);
 
-        c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
-        c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, @floatCast(f32, stats.time));
-        c.glProgramUniform2f(
-            cs_image_a.name,
-            cs_image_a.resolution_loc,
-            @intToFloat(f32, window_width),
-            @intToFloat(f32, window_height),
-        );
-        c.glProgramUniform4fv(cs_image_a.name, cs_image_a.fractal_c_loc, 1, &fractal_c);
-        c.glBindImageTexture(
-            cs_image_a.image_unit,
-            image_a,
-            0, // level
-            c.GL_FALSE, // layered
-            0, // layer
-            c.GL_READ_WRITE,
-            c.GL_RGBA32F,
-        );
-        c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs_image_a.name);
-        c.glDispatchCompute(
-            (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
-            (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
-            1,
-        );
-        c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
-        c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        if (true) {
+            while (true) {
+                drawFractal(time, frame_num, fractal_c, image_a);
+                c.glFinish();
+                frame_num += 1;
 
-        c.glProgramUniform2f(
-            fs_image.name,
-            fs_image.resolution_loc,
-            @intToFloat(f32, window_width),
-            @intToFloat(f32, window_height),
-        );
-        c.glBindTextureUnit(fs_image.image_unit, image_a);
-        c.glUseProgramStages(oglppo, c.GL_VERTEX_SHADER_BIT, vs_full_tri.name);
-        c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
-        c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
-        c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+                if (@mod(frame_num, 20) == 0) {
+                    var buffer = [_]u8{0} ** 128;
+                    const buffer_slice = buffer[0..];
+                    const image_name = std.fmt.bufPrint(
+                        buffer_slice,
+                        "frame_{:0>4}.png",
+                        .{@intCast(u32, image_num)},
+                    ) catch unreachable;
 
-        if (frame_num == 100) {
-            c.glReadPixels(0, 0, window_width, window_height, c.GL_RGB, c.GL_UNSIGNED_BYTE, image_data.items.ptr);
-            _ = c.stbi_write_png("frame_0000.png", window_width, window_height, 3, image_data.items.ptr, window_width * 3);
+                    c.glReadPixels(
+                        0,
+                        0,
+                        window_width,
+                        window_height,
+                        c.GL_RGB,
+                        c.GL_UNSIGNED_BYTE,
+                        image_data.items.ptr,
+                    );
+                    c.stbi_write_png_compression_level = 12;
+                    c.stbi_flip_vertically_on_write(1);
+                    _ = c.stbi_write_png(
+                        image_name.ptr,
+                        window_width,
+                        window_height,
+                        3,
+                        image_data.items.ptr,
+                        window_width * 3,
+                    );
+                    image_num += 1;
+                    //frame_num = 0;
+
+                    //c.glClearTexImage(image_a, 0, c.GL_RGBA, c.GL_FLOAT, &[_]f32{ 0.0, 0.0, 0.0, 0.0 });
+                    break;
+                }
+            }
+        } else {
+            drawFractal(time, frame_num, fractal_c, image_a);
+            frame_num += 1;
         }
 
-        frame_num += 1;
+        time += 0.04;
         if (c.glGetError() != c.GL_NO_ERROR) {
             std.debug.panic("OpenGL error detected.\n", .{});
         }
