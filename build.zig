@@ -36,7 +36,7 @@ pub fn build(b: *std.build.Builder) void {
 
     exe.addIncludeDir("c");
 
-    // TODO: Remove this once https://github.com/ziglang/zig/issues/8531 is fixed
+    // TODO: Remove this once https://github.com/ziglang/zig/issues/8531 is fixed.
     exe.want_lto = false;
 
     exe.linkSystemLibrary("user32");
