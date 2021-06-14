@@ -24,8 +24,8 @@ const src =
 \\  #version 460 core
 \\
 ++
- "  layout(\n" ++
- "      local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ",\n" ++
+ "  layout(" ++
+ "      local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ", " ++
  "      local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n" ++
@@ -327,8 +327,9 @@ const image_unit = 0;
 const src =
 \\  #version 460 core
 \\
-++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n"
-++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
+++
+ "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+ "  layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
 \\
 \\  layout(location = 0) out vec4 o_color;
 \\
@@ -486,26 +487,53 @@ pub fn main() !void {
 
     var frame_num: i32 = 0;
     var image_num: i32 = 0;
-    var time: f32 = 0.0;
-    var stage: u32 = 0;
 
     c.stbi_write_png_compression_level = 10;
     c.stbi_flip_vertically_on_write(1);
 
-    var fractal_c = [4]f32{ -2.0 / 20.0, 6.0 / 20.0, 15.0 / 20.0, -6.0 / 20.0 };
+    //var fractal_c = [4]f32{ -2.0 / 20.0, 6.0 / 20.0, 15.0 / 20.0, -6.0 / 20.0 };
+    var fractal_c: [4]f32 = undefined;
+    var fractal_comp: u32 = undefined;
+    var fractal_sign: f32 = undefined;
+
+    var time: f32 = 0.0;
+    var time0: f32 = 0.0;
+    var stage: u32 = 0;
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
         if (real_time) {
-            time = @floatCast(f32, stats.time);
+            time = time0 + @floatCast(f32, stats.time);
         }
 
-        fractal_c[2] = 0.75 + 0.25 * math.sin(0.1 * time);
-
-        if (stage == 0 and time >= 15.0) {
-            //stage += 1;
-            //fractal_c[1] = 0.0;
+        if (stage == 0 and time >= 0.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 0.0 };
+            fractal_comp = 2;
+            fractal_sign = 1.0;
+        } else if (stage == 1 and time >= 20.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.1, -1.0, 0.0, 0.5 };
+            fractal_comp = 1;
+            fractal_sign = 1.0;
+        } else if (stage == 2 and time >= 40.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, -1.0, 1.0, 0.0 };
+            fractal_comp = 2;
+            fractal_sign = -1.0;
+        } else if (stage == 3 and time >= 55.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 1.0 };
+            fractal_comp = 3;
+            fractal_sign = -1.0;
+        } else if (stage == 4 and time >= 70.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 1.0, 0.0, 0.0, 1.0 };
+            fractal_comp = 0;
+            fractal_sign = -0.5;
         }
+
+        fractal_c[fractal_comp] += fractal_sign * 0.0001 * time;
 
         if (real_time == false) {
             while (true) {
