@@ -23,16 +23,15 @@ const image_unit = 0;
 const src =
 \\  #version 460 core
 \\
-++ "layout(\n"
-++ "    local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ",\n"
-++ "    local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
-\\
-++ "layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
-\\
-++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
+++
+ "  layout(\n" ++
+ "      local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ",\n" ++
+ "      local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
+ "  layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
 \\  #define Z2
 \\  #define TRAPS
@@ -283,11 +282,17 @@ const src =
 \\
 \\      vec3 col = render(ro, rd);
 \\
-++     "vec3 old_col = imageLoad(u_image, q).rgb;\n" ++
-if (real_time)
-       "imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1)); }\n"
-else
-       "imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01)); }\n"
+\\      vec3 old_col = imageLoad(u_image, q).rgb;
+++
+blk: {
+    break :blk "\n" ++
+    if (real_time)
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n"
+    else
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01));\n";
+}
+++
+ "  }\n"
 ;};
 // zig fmt: on
 
@@ -393,6 +398,8 @@ pub fn main() !void {
         std.debug.panic("glfwInit() failed.\n", .{});
     }
     defer c.glfwTerminate();
+
+    std.debug.print("{s}", .{cs_image_a.src});
 
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, 4);
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, 6);
