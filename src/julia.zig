@@ -238,7 +238,6 @@ const src =
 \\
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
 \\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(0.0, 0.6, 1.0));
-\\      if (pos.y > 0.0) col = mix(col, vec3(1.0), 0.2);
 \\      float inside = smoothstep(14.0, 15.0, tn.y);
 \\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
@@ -406,8 +405,6 @@ pub fn main() !void {
     }
     defer c.glfwTerminate();
 
-    std.debug.print("{s}", .{cs_image_a.src});
-
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, 4);
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, 6);
     c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
@@ -477,8 +474,6 @@ pub fn main() !void {
     defer c.glDeleteVertexArrays(1, &vao);
     c.glBindVertexArray(vao);
 
-    var fractal_c = [4]f32{ -2.0 / 22.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 };
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const leaked = gpa.deinit();
@@ -492,9 +487,12 @@ pub fn main() !void {
     var frame_num: i32 = 0;
     var image_num: i32 = 0;
     var time: f32 = 0.0;
+    var stage: u32 = 0;
 
     c.stbi_write_png_compression_level = 10;
     c.stbi_flip_vertically_on_write(1);
+
+    var fractal_c = [4]f32{ -2.0 / 20.0, 6.0 / 20.0, 15.0 / 20.0, -6.0 / 20.0 };
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
@@ -503,6 +501,11 @@ pub fn main() !void {
         }
 
         fractal_c[2] = 0.75 + 0.25 * math.sin(0.1 * time);
+
+        if (stage == 0 and time >= 15.0) {
+            //stage += 1;
+            //fractal_c[1] = 0.0;
+        }
 
         if (real_time == false) {
             while (true) {
