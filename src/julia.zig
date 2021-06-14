@@ -45,8 +45,15 @@ const src =
 \\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
-\\  const int k_num_bounces = 4;
-\\
+++
+    blk: {
+        break :blk "\n" ++
+        if (real_time)
+ "  const int k_num_bounces = 2;\n\n"
+        else
+ "  const int k_num_bounces = 4;\n\n";
+    }
+++
 \\  int seed = 1;
 \\  void srand(int s) {
 \\      seed = s;
