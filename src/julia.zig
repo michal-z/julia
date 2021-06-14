@@ -5,8 +5,9 @@ const math = std.math;
 const comptimePrint = std.fmt.comptimePrint;
 
 const window_name = "quaternion julia sets";
-const window_width = 1920;
-const window_height = 1080;
+const real_time = true;
+const window_width = if (real_time) 1280 else 1920;
+const window_height = if (real_time) 720 else 1080;
 var oglppo: c.GLuint = 0;
 
 // zig fmt: off
@@ -45,7 +46,7 @@ const src =
 \\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
-\\  const int k_num_bounces = 8;
+\\  const int k_num_bounces = 4;
 \\
 \\  int seed = 1;
 \\  void srand(int s) {
@@ -265,7 +266,7 @@ const src =
 \\      }
 \\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
 \\
-\\      float an = 0.5;// + u_time * 0.01;
+\\      float an = 0.5 + u_time * 0.02;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\
 \\      #ifdef CUT
@@ -275,18 +276,18 @@ const src =
 \\      #endif
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
 \\
-\\      //for (int i = 0; i < 4; ++i) {
-\\          vec2 fragcoord = q + vec2(frand(), frand());
+\\      vec2 fragcoord = q + vec2(frand(), frand());
 \\
-\\          vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
-\\          vec3 rd = normalize(cam * vec3(p, k_foc_len));
+\\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
+\\      vec3 rd = normalize(cam * vec3(p, k_foc_len));
 \\
-\\          vec3 col = render(ro, rd);
+\\      vec3 col = render(ro, rd);
 \\
-\\          vec3 old_col = imageLoad(u_image, q).rgb;
-\\          imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.05));
-\\      //}
-\\  }
+++     "vec3 old_col = imageLoad(u_image, q).rgb;\n" ++
+if (real_time)
+       "imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1)); }\n"
+else
+       "imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01)); }\n"
 ;};
 // zig fmt: on
 
@@ -398,9 +399,9 @@ pub fn main() !void {
     c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
     c.glfwWindowHint(c.GLFW_OPENGL_FORWARD_COMPAT, c.GL_TRUE);
     if (builtin.mode == .ReleaseFast) {
-        //c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_FALSE);
+        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_FALSE);
     } else {
-        //c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_TRUE);
+        c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, c.GL_TRUE);
     }
     c.glfwWindowHint(c.GLFW_DEPTH_BITS, 24);
     c.glfwWindowHint(c.GLFW_STENCIL_BITS, 8);
@@ -426,7 +427,7 @@ pub fn main() !void {
     c.glBindProgramPipeline(oglppo);
 
     if (builtin.mode != .ReleaseFast) {
-        //c.glEnable(c.GL_DEBUG_OUTPUT);
+        c.glEnable(c.GL_DEBUG_OUTPUT);
         c.glDebugMessageCallback(handleGlError, null);
     }
 
@@ -478,23 +479,29 @@ pub fn main() !void {
     var image_num: i32 = 0;
     var time: f32 = 0.0;
 
+    c.stbi_write_png_compression_level = 10;
+    c.stbi_flip_vertically_on_write(1);
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
+        if (real_time) {
+            time = @floatCast(f32, stats.time);
+        }
 
-        fractal_c[2] = 0.5 + 0.5 * math.sin(0.1 * time);
+        fractal_c[2] = 0.75 + 0.25 * math.sin(0.1 * time);
 
-        if (true) {
+        if (real_time == false) {
             while (true) {
                 drawFractal(time, frame_num, fractal_c, image_a);
                 c.glFinish();
                 frame_num += 1;
 
-                if (@mod(frame_num, 20) == 0) {
+                if (@mod(frame_num, 100) == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
                         buffer_slice,
-                        "frame_{:0>4}.png",
+                        "frame_{:0>5}.png",
                         .{@intCast(u32, image_num)},
                     ) catch unreachable;
 
@@ -507,8 +514,6 @@ pub fn main() !void {
                         c.GL_UNSIGNED_BYTE,
                         image_data.items.ptr,
                     );
-                    c.stbi_write_png_compression_level = 12;
-                    c.stbi_flip_vertically_on_write(1);
                     _ = c.stbi_write_png(
                         image_name.ptr,
                         window_width,
@@ -518,18 +523,16 @@ pub fn main() !void {
                         window_width * 3,
                     );
                     image_num += 1;
-                    //frame_num = 0;
-
-                    //c.glClearTexImage(image_a, 0, c.GL_RGBA, c.GL_FLOAT, &[_]f32{ 0.0, 0.0, 0.0, 0.0 });
+                    frame_num = 0;
                     break;
                 }
             }
+            time += 0.04;
         } else {
             drawFractal(time, frame_num, fractal_c, image_a);
             frame_num += 1;
         }
 
-        time += 0.04;
         if (c.glGetError() != c.GL_NO_ERROR) {
             std.debug.panic("OpenGL error detected.\n", .{});
         }
@@ -572,8 +575,8 @@ fn updateFrameStats(
         const buffer_slice = buffer[0 .. buffer.len - 1];
         const header = std.fmt.bufPrint(
             buffer_slice,
-            "[{d:.1} fps  {d:.3} ms] {s}",
-            .{ fps, ms, name },
+            "[{d:.1} fps  {d:.3} ms | time: {d:.2}] {s}",
+            .{ fps, ms, time, name },
         ) catch buffer_slice;
 
         _ = c.glfwSetWindowTitle(window, header.ptr);
