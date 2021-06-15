@@ -13,6 +13,7 @@ var oglppo: c.GLuint = 0;
 // zig fmt: off
 const cs_image_a = struct {
 var name: c.GLuint = 0;
+var name_cut: c.GLuint = 0;
 const group_size_x = 8;
 const group_size_y = 8;
 const frame_loc = 0;
@@ -21,9 +22,6 @@ const resolution_loc = 2;
 const fractal_c_loc = 3;
 const image_unit = 0;
 const src =
-\\  #version 460 core
-\\
-++
  "  layout(" ++
  "      local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ", " ++
  "      local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
@@ -132,7 +130,11 @@ const src =
 \\          z = qSquare(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
+\\          #ifdef CUT
+\\          trap_dist = min(trap_dist, length(z.zz - vec2(0.25, 0.15)) - 0.1);
+\\          #else
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
+\\          #endif
 \\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
@@ -237,7 +239,7 @@ const src =
 \\  }
 \\
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
-\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(0.0, 0.6, 1.0));
+\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(1.0, 0.6, 0.2));
 \\      float inside = smoothstep(14.0, 15.0, tn.y);
 \\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
@@ -306,8 +308,6 @@ blk: {
 const vs_full_tri = struct {
 var name: c.GLuint = 0;
 const src =
-\\  #version 460 core
-\\
 \\  out gl_PerVertex {
 \\      vec4 gl_Position;
 \\  };
@@ -325,9 +325,6 @@ var name: c.GLuint = 0;
 const resolution_loc = 0;
 const image_unit = 0;
 const src =
-\\  #version 460 core
-\\
-++
  "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
  "  layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
 \\
@@ -346,8 +343,9 @@ const src =
 ;};
 // zig fmt: on
 
-fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
-    const prog = c.glCreateShaderProgramv(stype, 1, &@as([*c]const u8, glsl));
+fn createShaderProgram(stype: c.GLenum, glsl: [*c]const u8, defines: [*c]const u8) c.GLuint {
+    const arg = [3][*c]const u8{ "#version 460 core\n", defines, glsl };
+    const prog = c.glCreateShaderProgramv(stype, 3, &arg[0]);
     var status: c.GLint = 0;
     c.glGetProgramiv(prog, c.GL_LINK_STATUS, &status);
     if (status == c.GL_FALSE) {
@@ -358,16 +356,16 @@ fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
     return prog;
 }
 
-fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint) void {
-    c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
-    c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, time);
+fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint) void {
+    c.glProgramUniform1i(shader, cs_image_a.frame_loc, frame_num);
+    c.glProgramUniform1f(shader, cs_image_a.time_loc, time);
     c.glProgramUniform2f(
-        cs_image_a.name,
+        shader,
         cs_image_a.resolution_loc,
         @intToFloat(f32, window_width),
         @intToFloat(f32, window_height),
     );
-    c.glProgramUniform4fv(cs_image_a.name, cs_image_a.fractal_c_loc, 1, &fractal_c);
+    c.glProgramUniform4fv(shader, cs_image_a.fractal_c_loc, 1, &fractal_c);
     c.glBindImageTexture(
         cs_image_a.image_unit,
         image_a,
@@ -377,7 +375,7 @@ fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint) 
         c.GL_READ_WRITE,
         c.GL_RGBA32F,
     );
-    c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs_image_a.name);
+    c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, shader);
     c.glDispatchCompute(
         (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
         (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
@@ -461,13 +459,15 @@ pub fn main() !void {
     );
     defer c.glDeleteTextures(1, &image_a);
 
-    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src);
+    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "");
+    cs_image_a.name_cut = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define CUT\n");
     defer c.glDeleteProgram(cs_image_a.name);
+    defer c.glDeleteProgram(cs_image_a.name_cut);
 
-    vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src);
+    vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src, "");
     defer c.glDeleteProgram(vs_full_tri.name);
 
-    fs_image.name = createShaderProgram(c.GL_FRAGMENT_SHADER, fs_image.src);
+    fs_image.name = createShaderProgram(c.GL_FRAGMENT_SHADER, fs_image.src, "");
     defer c.glDeleteProgram(fs_image.name);
 
     var vao: c.GLuint = 0;
@@ -491,57 +491,85 @@ pub fn main() !void {
     c.stbi_write_png_compression_level = 10;
     c.stbi_flip_vertically_on_write(1);
 
-    //var fractal_c = [4]f32{ -2.0 / 20.0, 6.0 / 20.0, 15.0 / 20.0, -6.0 / 20.0 };
     var fractal_c: [4]f32 = undefined;
-    var fractal_comp: u32 = undefined;
+    var fractal_comp: i32 = undefined;
     var fractal_sign: f32 = undefined;
+    var fractal_shader: c.GLuint = cs_image_a.name;
+    var duration_scale: f32 = 1.0;
 
     var time: f32 = 0.0;
-    var time0: f32 = 0.0;
     var stage: u32 = 0;
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
         if (real_time) {
-            time = time0 + @floatCast(f32, stats.time);
+            time += stats.delta_time;
+        } else {
+            time += 0.04;
         }
 
-        if (stage == 0 and time >= 0.0) {
+        const scaled_time = duration_scale * time;
+        if (stage == 0 and scaled_time >= 0.0) {
             stage += 1;
             fractal_c = [4]f32{ 0.01, 0.0, -1.0, 0.0 };
             fractal_comp = 2;
             fractal_sign = 1.0;
-        } else if (stage == 1 and time >= 20.0) {
+        } else if (stage == 1 and scaled_time >= 12.9) {
             stage += 1;
             fractal_c = [4]f32{ 0.1, -1.0, 0.0, 0.5 };
             fractal_comp = 1;
             fractal_sign = 1.0;
-        } else if (stage == 2 and time >= 40.0) {
+        } else if (stage == 2 and scaled_time >= 40.0) {
             stage += 1;
             fractal_c = [4]f32{ 0.01, -1.0, 1.0, 0.0 };
             fractal_comp = 2;
             fractal_sign = -1.0;
-        } else if (stage == 3 and time >= 55.0) {
+        } else if (stage == 3 and scaled_time >= 55.0) {
             stage += 1;
             fractal_c = [4]f32{ 0.01, 0.0, -1.0, 1.0 };
             fractal_comp = 3;
             fractal_sign = -1.0;
-        } else if (stage == 4 and time >= 70.0) {
+        } else if (stage == 4 and scaled_time >= 70.0) {
             stage += 1;
             fractal_c = [4]f32{ 1.0, 0.0, 0.0, 1.0 };
             fractal_comp = 0;
             fractal_sign = -0.5;
+        } else if (stage == 5 and scaled_time >= 85.0) {
+            stage += 1;
+            fractal_c = [4]f32{ -2.0 / 22.5, 0.5, 15.0 / 22.5, -6.0 / 22.5 };
+            fractal_comp = 0;
+            fractal_sign = 0.01;
+            fractal_shader = cs_image_a.name_cut;
+        } else if (stage == 6 and scaled_time >= 95.0) {
+            stage += 1;
+            fractal_comp = 0;
+            fractal_sign = -0.01;
+        } else if (stage == 7 and scaled_time >= 115.0) {
+            stage += 1;
+            fractal_c = [4]f32{ -1.0, 0.5, 0.0, 0.25 };
+            fractal_comp = 2;
+            fractal_sign = 0.05;
+        } else if (stage == 8 and scaled_time >= 125.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.0, 0.5, 1.0, 0.25 };
+            fractal_comp = 3;
+            fractal_sign = 0.05;
+        } else if (stage == 9 and scaled_time >= 135.0) {
+            stage = 0;
+            time = 0.0;
+            duration_scale *= 1.9;
         }
 
-        fractal_c[fractal_comp] += fractal_sign * 0.0001 * time;
+        if (fractal_comp > -1)
+            fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
 
         if (real_time == false) {
             while (true) {
-                drawFractal(time, frame_num, fractal_c, image_a);
+                drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
                 c.glFinish();
                 frame_num += 1;
 
-                if (@mod(frame_num, 100) == 0) {
+                if (@mod(frame_num, 25) == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
@@ -572,9 +600,8 @@ pub fn main() !void {
                     break;
                 }
             }
-            time += 0.04;
         } else {
-            drawFractal(time, frame_num, fractal_c, image_a);
+            drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
             frame_num += 1;
         }
 
