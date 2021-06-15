@@ -5,31 +5,31 @@ const math = std.math;
 const comptimePrint = std.fmt.comptimePrint;
 
 const window_name = "quaternion julia sets";
-const window_width = 1920;
-const window_height = 1080;
+const real_time = true;
+const window_width = if (real_time) 1280 else 1920;
+const window_height = if (real_time) 720 else 1080;
 var oglppo: c.GLuint = 0;
 
 // zig fmt: off
 const cs_image_a = struct {
 var name: c.GLuint = 0;
+var name_cut: c.GLuint = 0;
 const group_size_x = 8;
 const group_size_y = 8;
 const frame_loc = 0;
 const time_loc = 1;
 const resolution_loc = 2;
+const fractal_c_loc = 3;
 const image_unit = 0;
 const src =
-\\  #version 460 core
-\\
-++ "layout(\n"
-++ "    local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ",\n"
-++ "    local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
-\\
-++ "layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n"
-++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
-\\
-++ "layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
+ "  layout(" ++
+ "      local_size_x = " ++ comptimePrint("{d}", .{group_size_x}) ++ ", " ++
+ "      local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
+ "  layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
 \\  #define Z2
 \\  #define TRAPS
@@ -43,9 +43,15 @@ const src =
 \\  #endif
 \\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
-\\  const int k_num_bounces = 3;
-\\  const vec4 k_c = vec4(-2.0, 6.0, 15.0, -6.0) / 22.0;
-\\
+++
+    blk: {
+        break :blk "\n" ++
+        if (real_time)
+ "  const int k_num_bounces = 2;\n\n"
+        else
+ "  const int k_num_bounces = 4;\n\n";
+    }
+++
 \\  int seed = 1;
 \\  void srand(int s) {
 \\      seed = s;
@@ -121,10 +127,14 @@ const src =
 \\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
-\\          z = qSquare(z) + k_c;
+\\          z = qSquare(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
+\\          #ifdef CUT
+\\          trap_dist = min(trap_dist, length(z.zz - vec2(0.25, 0.15)) - 0.1);
+\\          #else
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
+\\          #endif
 \\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
@@ -139,7 +149,7 @@ const src =
 \\      float dz2 = 1.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
-\\          z = qCube(z) + k_c;
+\\          z = qCube(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
@@ -229,8 +239,7 @@ const src =
 \\  }
 \\
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
-\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(0.0, 0.6, 1.0));
-\\      if (pos.y > 0.0) col = mix(col, vec3(1.0), 0.2);
+\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(1.0, 0.6, 0.2));
 \\      float inside = smoothstep(14.0, 15.0, tn.y);
 \\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
@@ -264,9 +273,7 @@ const src =
 \\      }
 \\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
 \\
-\\      vec2 fragcoord = q + vec2(0.5);
-\\
-\\      float an = 0.5 + u_time * 0.01;
+\\      float an = 0.5 + u_time * 0.02;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\
 \\      #ifdef CUT
@@ -276,14 +283,24 @@ const src =
 \\      #endif
 \\      mat3x3 cam = setCamera(ro, ta, 0.0);
 \\
+\\      vec2 fragcoord = q + vec2(frand(), frand());
+\\
 \\      vec2 p = (2.0 * fragcoord - u_resolution) / u_resolution.y;
 \\      vec3 rd = normalize(cam * vec3(p, k_foc_len));
 \\
 \\      vec3 col = render(ro, rd);
 \\
 \\      vec3 old_col = imageLoad(u_image, q).rgb;
-\\      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.06));
-\\  }
+++
+blk: {
+    break :blk "\n" ++
+    if (real_time)
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n"
+    else
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01));\n";
+}
+++
+ "  }\n"
 ;};
 // zig fmt: on
 
@@ -291,8 +308,6 @@ const src =
 const vs_full_tri = struct {
 var name: c.GLuint = 0;
 const src =
-\\  #version 460 core
-\\
 \\  out gl_PerVertex {
 \\      vec4 gl_Position;
 \\  };
@@ -310,10 +325,8 @@ var name: c.GLuint = 0;
 const resolution_loc = 0;
 const image_unit = 0;
 const src =
-\\  #version 460 core
-\\
-++ "layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n"
-++ "layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
+ "  layout(binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform sampler2D u_image;\n" ++
 \\
 \\  layout(location = 0) out vec4 o_color;
 \\
@@ -330,8 +343,9 @@ const src =
 ;};
 // zig fmt: on
 
-fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
-    const prog = c.glCreateShaderProgramv(stype, 1, &@as([*c]const u8, glsl));
+fn createShaderProgram(stype: c.GLenum, glsl: [*c]const u8, defines: [*c]const u8) c.GLuint {
+    const arg = [3][*c]const u8{ "#version 460 core\n", defines, glsl };
+    const prog = c.glCreateShaderProgramv(stype, 3, &arg[0]);
     var status: c.GLint = 0;
     c.glGetProgramiv(prog, c.GL_LINK_STATUS, &status);
     if (status == c.GL_FALSE) {
@@ -340,6 +354,47 @@ fn createShaderProgram(stype: c.GLenum, glsl: [*]const u8) c.GLuint {
         std.debug.panic("{s}\n", .{log});
     }
     return prog;
+}
+
+fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint) void {
+    c.glProgramUniform1i(shader, cs_image_a.frame_loc, frame_num);
+    c.glProgramUniform1f(shader, cs_image_a.time_loc, time);
+    c.glProgramUniform2f(
+        shader,
+        cs_image_a.resolution_loc,
+        @intToFloat(f32, window_width),
+        @intToFloat(f32, window_height),
+    );
+    c.glProgramUniform4fv(shader, cs_image_a.fractal_c_loc, 1, &fractal_c);
+    c.glBindImageTexture(
+        cs_image_a.image_unit,
+        image_a,
+        0, // level
+        c.GL_FALSE, // layered
+        0, // layer
+        c.GL_READ_WRITE,
+        c.GL_RGBA32F,
+    );
+    c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, shader);
+    c.glDispatchCompute(
+        (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
+        (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
+        1,
+    );
+    c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+    c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    c.glProgramUniform2f(
+        fs_image.name,
+        fs_image.resolution_loc,
+        @intToFloat(f32, window_width),
+        @intToFloat(f32, window_height),
+    );
+    c.glBindTextureUnit(fs_image.image_unit, image_a);
+    c.glUseProgramStages(oglppo, c.GL_VERTEX_SHADER_BIT, vs_full_tri.name);
+    c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
+    c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
+    c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
 }
 
 pub fn main() !void {
@@ -404,13 +459,15 @@ pub fn main() !void {
     );
     defer c.glDeleteTextures(1, &image_a);
 
-    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src);
+    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "");
+    cs_image_a.name_cut = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define CUT\n");
     defer c.glDeleteProgram(cs_image_a.name);
+    defer c.glDeleteProgram(cs_image_a.name_cut);
 
-    vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src);
+    vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src, "");
     defer c.glDeleteProgram(vs_full_tri.name);
 
-    fs_image.name = createShaderProgram(c.GL_FRAGMENT_SHADER, fs_image.src);
+    fs_image.name = createShaderProgram(c.GL_FRAGMENT_SHADER, fs_image.src, "");
     defer c.glDeleteProgram(fs_image.name);
 
     var vao: c.GLuint = 0;
@@ -418,50 +475,136 @@ pub fn main() !void {
     defer c.glDeleteVertexArrays(1, &vao);
     c.glBindVertexArray(vao);
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const leaked = gpa.deinit();
+        std.debug.assert(leaked == false);
+    }
+
+    var image_data = try std.ArrayList(u8).initCapacity(&gpa.allocator, window_width * window_height * 3);
+    try image_data.resize(window_width * window_height * 3);
+    defer image_data.deinit();
+
     var frame_num: i32 = 0;
+    var image_num: i32 = 0;
+
+    c.stbi_write_png_compression_level = 10;
+    c.stbi_flip_vertically_on_write(1);
+
+    var fractal_c: [4]f32 = undefined;
+    var fractal_comp: i32 = undefined;
+    var fractal_sign: f32 = undefined;
+    var fractal_shader: c.GLuint = cs_image_a.name;
+    var duration_scale: f32 = 1.0;
+
+    var time: f32 = 0.0;
+    var stage: u32 = 0;
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
+        if (real_time) {
+            time += stats.delta_time;
+        } else {
+            time += 0.04;
+        }
 
-        c.glProgramUniform1i(cs_image_a.name, cs_image_a.frame_loc, frame_num);
-        c.glProgramUniform1f(cs_image_a.name, cs_image_a.time_loc, @floatCast(f32, stats.time));
-        c.glProgramUniform2f(
-            cs_image_a.name,
-            cs_image_a.resolution_loc,
-            @intToFloat(f32, window_width),
-            @intToFloat(f32, window_height),
-        );
-        c.glBindImageTexture(
-            cs_image_a.image_unit,
-            image_a,
-            0, // level
-            c.GL_FALSE, // layered
-            0, // layer
-            c.GL_READ_WRITE,
-            c.GL_RGBA32F,
-        );
-        c.glUseProgramStages(oglppo, c.GL_COMPUTE_SHADER_BIT, cs_image_a.name);
-        c.glDispatchCompute(
-            (window_width + cs_image_a.group_size_x - 1) / cs_image_a.group_size_x,
-            (window_height + cs_image_a.group_size_y - 1) / cs_image_a.group_size_y,
-            1,
-        );
-        c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
-        c.glMemoryBarrier(c.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        const scaled_time = duration_scale * time;
+        if (stage == 0 and scaled_time >= 0.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 0.0 };
+            fractal_comp = 2;
+            fractal_sign = 1.0;
+        } else if (stage == 1 and scaled_time >= 12.9) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.1, -1.0, 0.0, 0.5 };
+            fractal_comp = 1;
+            fractal_sign = 1.0;
+        } else if (stage == 2 and scaled_time >= 40.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, -1.0, 1.0, 0.0 };
+            fractal_comp = 2;
+            fractal_sign = -1.0;
+        } else if (stage == 3 and scaled_time >= 55.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 1.0 };
+            fractal_comp = 3;
+            fractal_sign = -1.0;
+        } else if (stage == 4 and scaled_time >= 70.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 1.0, 0.0, 0.0, 1.0 };
+            fractal_comp = 0;
+            fractal_sign = -0.5;
+        } else if (stage == 5 and scaled_time >= 85.0) {
+            stage += 1;
+            fractal_c = [4]f32{ -2.0 / 22.5, 0.5, 15.0 / 22.5, -6.0 / 22.5 };
+            fractal_comp = 0;
+            fractal_sign = 0.01;
+            fractal_shader = cs_image_a.name_cut;
+        } else if (stage == 6 and scaled_time >= 95.0) {
+            stage += 1;
+            fractal_comp = 0;
+            fractal_sign = -0.01;
+        } else if (stage == 7 and scaled_time >= 115.0) {
+            stage += 1;
+            fractal_c = [4]f32{ -1.0, 0.5, 0.0, 0.25 };
+            fractal_comp = 2;
+            fractal_sign = 0.05;
+        } else if (stage == 8 and scaled_time >= 125.0) {
+            stage += 1;
+            fractal_c = [4]f32{ 0.0, 0.5, 1.0, 0.25 };
+            fractal_comp = 3;
+            fractal_sign = 0.05;
+        } else if (stage == 9 and scaled_time >= 135.0) {
+            stage = 0;
+            time = 0.0;
+            duration_scale *= 1.9;
+        }
 
-        c.glProgramUniform2f(
-            fs_image.name,
-            fs_image.resolution_loc,
-            @intToFloat(f32, window_width),
-            @intToFloat(f32, window_height),
-        );
-        c.glBindTextureUnit(fs_image.image_unit, image_a);
-        c.glUseProgramStages(oglppo, c.GL_VERTEX_SHADER_BIT, vs_full_tri.name);
-        c.glUseProgramStages(oglppo, c.GL_FRAGMENT_SHADER_BIT, fs_image.name);
-        c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
-        c.glUseProgramStages(oglppo, c.GL_ALL_SHADER_BITS, 0);
+        if (fractal_comp > -1)
+            fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
 
-        frame_num += 1;
+        if (real_time == false) {
+            while (true) {
+                drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
+                c.glFinish();
+                frame_num += 1;
+
+                if (@mod(frame_num, 25) == 0) {
+                    var buffer = [_]u8{0} ** 128;
+                    const buffer_slice = buffer[0..];
+                    const image_name = std.fmt.bufPrint(
+                        buffer_slice,
+                        "frame_{:0>5}.png",
+                        .{@intCast(u32, image_num)},
+                    ) catch unreachable;
+
+                    c.glReadPixels(
+                        0,
+                        0,
+                        window_width,
+                        window_height,
+                        c.GL_RGB,
+                        c.GL_UNSIGNED_BYTE,
+                        image_data.items.ptr,
+                    );
+                    _ = c.stbi_write_png(
+                        image_name.ptr,
+                        window_width,
+                        window_height,
+                        3,
+                        image_data.items.ptr,
+                        window_width * 3,
+                    );
+                    image_num += 1;
+                    frame_num = 0;
+                    break;
+                }
+            }
+        } else {
+            drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
+            frame_num += 1;
+        }
+
         if (c.glGetError() != c.GL_NO_ERROR) {
             std.debug.panic("OpenGL error detected.\n", .{});
         }
@@ -504,8 +647,8 @@ fn updateFrameStats(
         const buffer_slice = buffer[0 .. buffer.len - 1];
         const header = std.fmt.bufPrint(
             buffer_slice,
-            "[{d:.1} fps  {d:.3} ms] {s}",
-            .{ fps, ms, name },
+            "[{d:.1} fps  {d:.3} ms | time: {d:.2}] {s}",
+            .{ fps, ms, time, name },
         ) catch buffer_slice;
 
         _ = c.glfwSetWindowTitle(window, header.ptr);
