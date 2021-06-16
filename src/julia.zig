@@ -12,8 +12,10 @@ var oglppo: c.GLuint = 0;
 
 // zig fmt: off
 const cs_image_a = struct {
-var name: c.GLuint = 0;
-var name_cut: c.GLuint = 0;
+var name_z2: c.GLuint = 0;
+var name_z3: c.GLuint = 0;
+var name_z2_cut: c.GLuint = 0;
+var name_z3_cut: c.GLuint = 0;
 const group_size_x = 8;
 const group_size_y = 8;
 const frame_loc = 0;
@@ -31,7 +33,7 @@ const src =
  "  layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
  "  layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
-\\  #define Z2
+\\  //#define Z3
 \\  #define TRAPS
 \\  //#define CUT
 \\
@@ -41,15 +43,14 @@ const src =
 \\  #else
 \\  const float k_bounding_sphere_rad = 1.2;
 \\  #endif
-\\  const float k_precis = 0.00025;
 \\  const int k_num_iter = 200;
 ++
     blk: {
         break :blk "\n" ++
         if (real_time)
- "  const int k_num_bounces = 2;\n\n"
+ "  const int k_num_bounces = 2;\n  const float k_precis = 0.00025;\n\n"
         else
- "  const int k_num_bounces = 4;\n\n";
+ "  const int k_num_bounces = 4;\n  const float k_precis = 0.0001;\n\n";
     }
 ++
 \\  int seed = 1;
@@ -131,7 +132,8 @@ const src =
 \\          m2 = qLength2(z);
 \\          #ifdef TRAPS
 \\          #ifdef CUT
-\\          trap_dist = min(trap_dist, length(z.zz - vec2(0.25, 0.15)) - 0.1);
+\\          //trap_dist = min(trap_dist, length(z.zz - vec2(0.25, 0.15)) - 0.1);
+\\          trap_dist = min(trap_dist, length(z.z - 0.25) - 0.01);
 \\          #else
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
 \\          #endif
@@ -144,7 +146,9 @@ const src =
 \\      float m = sqrt(m2);
 \\      float dist = 0.5 * m * log(m) / length(zp);
 \\
-\\      #else // z^3 + c
+\\      #endif // #ifdef Z2
+\\
+\\      #ifdef Z3 // z^3 + c
 \\
 \\      float dz2 = 1.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
@@ -161,7 +165,7 @@ const src =
 \\      }
 \\      float dist = 0.25 * log(m2) * sqrt(m2 / dz2);
 \\
-\\      #endif // #ifdef Z2
+\\      #endif // #ifdef Z3
 \\
 \\      #ifdef TRAPS
 \\      dist = min(dist, trap_dist);
@@ -239,12 +243,12 @@ const src =
 \\  }
 \\
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
-\\      vec3 col = 0.5 + 0.5 * cos(log2(tn.y) * 0.9 + 3.5 + vec3(1.0, 0.6, 0.2));
-\\      float inside = smoothstep(14.0, 15.0, tn.y);
-\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.55, 0.58, 0.60) * inside;
+\\      vec3 col = 0.5 + 0.5 * cos(log(tn.y) * vec3(1.0) * 0.9);
+\\      float inside = smoothstep(11.0, 12.0, tn.y);
+\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.0, 0.0, 0.60) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
 \\      col = mix(mix(col, vec3(dot(col, vec3(0.3333))), -0.4), col, inside);
-\\      return clamp(col * 0.65, 0.0, 1.0);
+\\      return clamp(col, 0.0, 1.0);
 \\  }
 \\
 \\  vec3 render(vec3 ro, vec3 rd) {
@@ -254,7 +258,7 @@ const src =
 \\          vec2 tn = castRay(ro, rd);
 \\          float t = tn.x;
 \\          if (t < 0.0) {
-\\              return bounce > 0 ? color_mask * 1.65 * step(0.0, rd.y) : vec3(clamp(0.02 + 0.021 * rd.y, 0.0, 1.0));
+\\              return bounce > 0 ? color_mask * 1.65 * step(0.0, rd.y) : vec3(clamp(0.2 + 0.21 * rd.y, 0.0, 1.0));
 \\          } else {
 \\              vec3 pos = ro + rd * t;
 \\              vec3 nor = calcNormal(pos);
@@ -459,10 +463,14 @@ pub fn main() !void {
     );
     defer c.glDeleteTextures(1, &image_a);
 
-    cs_image_a.name = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "");
-    cs_image_a.name_cut = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define CUT\n");
-    defer c.glDeleteProgram(cs_image_a.name);
-    defer c.glDeleteProgram(cs_image_a.name_cut);
+    cs_image_a.name_z2 = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define Z2\n");
+    cs_image_a.name_z3 = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define Z3\n");
+    cs_image_a.name_z2_cut = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define Z2\n#define CUT\n");
+    cs_image_a.name_z3_cut = createShaderProgram(c.GL_COMPUTE_SHADER, cs_image_a.src, "#define Z3\n#define CUT\n");
+    defer c.glDeleteProgram(cs_image_a.name_z2);
+    defer c.glDeleteProgram(cs_image_a.name_z3);
+    defer c.glDeleteProgram(cs_image_a.name_z2_cut);
+    defer c.glDeleteProgram(cs_image_a.name_z3_cut);
 
     vs_full_tri.name = createShaderProgram(c.GL_VERTEX_SHADER, vs_full_tri.src, "");
     defer c.glDeleteProgram(vs_full_tri.name);
@@ -492,13 +500,84 @@ pub fn main() !void {
     c.stbi_flip_vertically_on_write(1);
 
     var fractal_c: [4]f32 = undefined;
-    var fractal_comp: i32 = undefined;
+    var fractal_comp: u32 = undefined;
     var fractal_sign: f32 = undefined;
-    var fractal_shader: c.GLuint = cs_image_a.name;
-    var duration_scale: f32 = 1.0;
+    var fractal_shader: c.GLuint = cs_image_a.name_z3_cut;
 
-    var time: f32 = 0.0;
+    const Stage = struct {
+        c: [4]f32,
+        comp: u32,
+        sign: f32,
+        shader: c.GLuint,
+        fade_to_black: bool = false,
+        duration: f32,
+    };
+    const stages = [_]Stage{
+        .{
+            .c = .{ 0.01, 0.5, -1.0, 0.0 },
+            .comp = 2,
+            .sign = 0.025,
+            .shader = cs_image_a.name_z3_cut,
+            .duration = 15.0,
+            .fade_to_black = true,
+        },
+        .{
+            .c = .{ 0.1, -1.0, 0.0, 0.5 },
+            .comp = 1,
+            .sign = 1.0,
+            .shader = cs_image_a.name_z2,
+            .duration = 10.0,
+        },
+        .{
+            .c = .{ 0.01, -1.0, 1.0, 0.0 },
+            .comp = 2,
+            .sign = -1.0,
+            .shader = cs_image_a.name_z2,
+            .duration = 15.0,
+            .fade_to_black = true,
+        },
+        .{
+            .c = .{ 0.01, 0.0, -1.0, 1.0 },
+            .comp = 3,
+            .sign = -1.0,
+            .shader = cs_image_a.name_z2,
+            .duration = 10.0,
+            .fade_to_black = true,
+        },
+        .{
+            .c = .{ 0.25, 0.5, -1.0, 0.1 },
+            .comp = 1,
+            .sign = -0.5,
+            .shader = cs_image_a.name_z3,
+            .duration = 10.0,
+            .fade_to_black = true,
+        },
+        .{
+            .c = .{ -0.025, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .comp = 0,
+            .sign = 0.01,
+            .shader = cs_image_a.name_z2_cut,
+            .duration = 8.0,
+            .fade_to_black = true,
+        },
+        .{
+            .c = .{ 20.0, 20.0, 20.0, 20.0 },
+            .comp = 0,
+            .sign = 0.0,
+            .shader = cs_image_a.name_z2,
+            .duration = 5.0,
+            .fade_to_black = true,
+        },
+    };
+
     var stage: u32 = 0;
+    var time: f32 = 0.0;
+    {
+        var i: u32 = 0;
+        while (i < stage) : (i += 1) {
+            time += stages[i].duration;
+        }
+    }
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
@@ -508,60 +587,32 @@ pub fn main() !void {
             time += 0.04;
         }
 
-        const scaled_time = duration_scale * time;
-        if (stage == 0 and scaled_time >= 0.0) {
-            stage += 1;
-            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 0.0 };
-            fractal_comp = 2;
-            fractal_sign = 1.0;
-        } else if (stage == 1 and scaled_time >= 12.9) {
-            stage += 1;
-            fractal_c = [4]f32{ 0.1, -1.0, 0.0, 0.5 };
-            fractal_comp = 1;
-            fractal_sign = 1.0;
-        } else if (stage == 2 and scaled_time >= 40.0) {
-            stage += 1;
-            fractal_c = [4]f32{ 0.01, -1.0, 1.0, 0.0 };
-            fractal_comp = 2;
-            fractal_sign = -1.0;
-        } else if (stage == 3 and scaled_time >= 55.0) {
-            stage += 1;
-            fractal_c = [4]f32{ 0.01, 0.0, -1.0, 1.0 };
-            fractal_comp = 3;
-            fractal_sign = -1.0;
-        } else if (stage == 4 and scaled_time >= 70.0) {
-            stage += 1;
-            fractal_c = [4]f32{ 1.0, 0.0, 0.0, 1.0 };
-            fractal_comp = 0;
-            fractal_sign = -0.5;
-        } else if (stage == 5 and scaled_time >= 85.0) {
-            stage += 1;
-            fractal_c = [4]f32{ -2.0 / 22.5, 0.5, 15.0 / 22.5, -6.0 / 22.5 };
-            fractal_comp = 0;
-            fractal_sign = 0.01;
-            fractal_shader = cs_image_a.name_cut;
-        } else if (stage == 6 and scaled_time >= 95.0) {
-            stage += 1;
-            fractal_comp = 0;
-            fractal_sign = -0.01;
-        } else if (stage == 7 and scaled_time >= 115.0) {
-            stage += 1;
-            fractal_c = [4]f32{ -1.0, 0.5, 0.0, 0.25 };
-            fractal_comp = 2;
-            fractal_sign = 0.05;
-        } else if (stage == 8 and scaled_time >= 125.0) {
-            stage += 1;
-            fractal_c = [4]f32{ 0.0, 0.5, 1.0, 0.25 };
-            fractal_comp = 3;
-            fractal_sign = 0.05;
-        } else if (stage == 9 and scaled_time >= 135.0) {
-            stage = 0;
-            time = 0.0;
-            duration_scale *= 1.9;
+        var fade_to_black: bool = false;
+        var stage_time: f32 = 0.0;
+        var i: u32 = 0;
+        while (i < stages.len) : (i += 1) {
+            if (time >= stage_time and stage == i) {
+                stage += 1;
+                fade_to_black = stages[i].fade_to_black;
+                fractal_c = stages[i].c;
+                fractal_comp = stages[i].comp;
+                fractal_sign = stages[i].sign;
+                fractal_shader = stages[i].shader;
+            }
+            stage_time += stages[i].duration;
         }
 
-        if (fractal_comp > -1)
-            fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
+        fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
+
+        if (fade_to_black) {
+            c.glClearTexImage(
+                image_a,
+                0,
+                c.GL_RGBA,
+                c.GL_FLOAT,
+                &[_]f32{ 0.0, 0.0, 0.0, 0.0 },
+            );
+        }
 
         if (real_time == false) {
             while (true) {
@@ -569,7 +620,7 @@ pub fn main() !void {
                 c.glFinish();
                 frame_num += 1;
 
-                if (@mod(frame_num, 25) == 0) {
+                if (@mod(frame_num, 50) == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
