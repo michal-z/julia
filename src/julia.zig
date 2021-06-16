@@ -34,15 +34,10 @@ const src =
  "  layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
 \\
 \\  //#define Z3
-\\  #define TRAPS
 \\  //#define CUT
 \\
-\\  const float k_foc_len = 3.0;
-\\  #ifdef TRAPS
-\\  const float k_bounding_sphere_rad = 2.0;
-\\  #else
-\\  const float k_bounding_sphere_rad = 1.2;
-\\  #endif
+\\  const float k_foc_len = 3.3;
+\\  const float k_bounding_sphere_rad = 2.5;
 \\  const int k_num_iter = 200;
 ++
     blk: {
@@ -119,9 +114,7 @@ const src =
 \\      vec4 z = vec4(p, 0.0);
 \\      float m2 = 0.0;
 \\      float n = 0.0;
-\\      #ifdef TRAPS
 \\      float trap_dist = 1e10;
-\\      #endif
 \\
 \\      #ifdef Z2 // z^2 + c
 \\
@@ -130,13 +123,10 @@ const src =
 \\          zp = 2.0 * qMul(z, zp);
 \\          z = qSquare(z) + u_fractal_c;
 \\          m2 = qLength2(z);
-\\          #ifdef TRAPS
 \\          #ifdef CUT
-\\          //trap_dist = min(trap_dist, length(z.zz - vec2(0.25, 0.15)) - 0.1);
 \\          trap_dist = min(trap_dist, length(z.z - 0.25) - 0.01);
 \\          #else
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
-\\          #endif
 \\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
@@ -155,9 +145,7 @@ const src =
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
 \\          z = qCube(z) + u_fractal_c;
 \\          m2 = qLength2(z);
-\\          #ifdef TRAPS
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
-\\          #endif
 \\          if (m2 > 256.0) {
 \\              break;
 \\          }
@@ -167,9 +155,7 @@ const src =
 \\
 \\      #endif // #ifdef Z3
 \\
-\\      #ifdef TRAPS
 \\      dist = min(dist, trap_dist);
-\\      #endif
 \\      #ifdef CUT
 \\      dist = max(dist, p.y);
 \\      #endif
@@ -219,11 +205,7 @@ const src =
 \\          }
 \\          lt = t;
 \\          lh = res.x;
-\\          #ifndef TRAPS
-\\          t += min(res.x, 0.2);
-\\          #else
 \\          t += min(res.x, 0.01) * (0.5 + 0.5 * frand());
-\\          #endif
 \\          if (t > tmax) {
 \\              break;
 \\          }
