@@ -5,7 +5,7 @@ const math = std.math;
 const comptimePrint = std.fmt.comptimePrint;
 
 const window_name = "quaternion julia sets";
-const real_time = true;
+const real_time = false;
 const window_width = if (real_time) 1280 else 1920;
 const window_height = if (real_time) 720 else 1080;
 var oglppo: c.GLuint = 0;
@@ -36,8 +36,8 @@ const src =
 \\  //#define Z3
 \\  //#define CUT
 \\
-\\  const float k_foc_len = 3.3;
-\\  const float k_bounding_sphere_rad = 2.5;
+\\  const float k_foc_len = 3.2;
+\\  const float k_bounding_sphere_rad = 2.2;
 \\  const int k_num_iter = 200;
 ++
     blk: {
@@ -45,7 +45,7 @@ const src =
         if (real_time)
  "  const int k_num_bounces = 2;\n  const float k_precis = 0.00025;\n\n"
         else
- "  const int k_num_bounces = 4;\n  const float k_precis = 0.0001;\n\n";
+ "  const int k_num_bounces = 4;\n  const float k_precis = 0.00025;\n\n";
     }
 ++
 \\  int seed = 1;
@@ -259,7 +259,7 @@ const src =
 \\      }
 \\      srand(hash(q.x + hash(q.y + hash(1117 * u_frame))));
 \\
-\\      float an = 0.5 + u_time * 0.02;
+\\      float an = 0.5 + u_time * 0.05;
 \\      vec3 ro = 2.0 * vec3(sin(an), 0.8, cos(an));
 \\
 \\      #ifdef CUT
@@ -283,7 +283,7 @@ blk: {
     if (real_time)
  "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n"
     else
- "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01));\n";
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n";
 }
 ++
  "  }\n"
@@ -566,7 +566,7 @@ pub fn main() !void {
         if (real_time) {
             time += stats.delta_time;
         } else {
-            time += 0.04;
+            time = @intToFloat(f32, image_num) * (1.0 / 24.0);
         }
 
         var fade_to_black: bool = false;
@@ -602,7 +602,7 @@ pub fn main() !void {
                 c.glFinish();
                 frame_num += 1;
 
-                if (@mod(frame_num, 50) == 0) {
+                if (@mod(frame_num, 5) == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
