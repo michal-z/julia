@@ -282,7 +282,7 @@ const src =
 blk: {
     break :blk "\n" ++
     if (real_time)
- "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n"
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.25));\n"
     else
  "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n";
 }
