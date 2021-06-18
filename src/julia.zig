@@ -5,7 +5,8 @@ const math = std.math;
 const comptimePrint = std.fmt.comptimePrint;
 
 const window_name = "quaternion julia sets";
-const real_time = false;
+const real_time = true;
+const fps = 24;
 const window_width = if (real_time) 1280 else 1920;
 const window_height = if (real_time) 720 else 1080;
 var oglppo: c.GLuint = 0;
@@ -342,8 +343,8 @@ fn createShaderProgram(stype: c.GLenum, glsl: [*c]const u8, defines: [*c]const u
     return prog;
 }
 
-fn drawFractal(time: f32, frame_num: i32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint) void {
-    c.glProgramUniform1i(shader, cs_image_a.frame_loc, frame_num);
+fn drawFractal(time: f32, frame_num: u32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint) void {
+    c.glProgramUniform1i(shader, cs_image_a.frame_loc, @intCast(i32, frame_num));
     c.glProgramUniform1f(shader, cs_image_a.time_loc, time);
     c.glProgramUniform2f(
         shader,
@@ -475,16 +476,8 @@ pub fn main() !void {
     try image_data.resize(window_width * window_height * 3);
     defer image_data.deinit();
 
-    var frame_num: i32 = 0;
-    var image_num: i32 = 0;
-
     c.stbi_write_png_compression_level = 10;
     c.stbi_flip_vertically_on_write(1);
-
-    var fractal_c: [4]f32 = undefined;
-    var fractal_comp: u32 = undefined;
-    var fractal_sign: f32 = undefined;
-    var fractal_shader: c.GLuint = cs_image_a.name_z3_cut;
 
     const Stage = struct {
         c: [4]f32,
@@ -492,7 +485,7 @@ pub fn main() !void {
         sign: f32,
         shader: c.GLuint,
         fade_to_black: bool = false,
-        duration: f32,
+        num_frames: u32,
     };
     const stages = [_]Stage{
         .{
@@ -500,7 +493,7 @@ pub fn main() !void {
             .comp = 2,
             .sign = 0.025,
             .shader = cs_image_a.name_z3_cut,
-            .duration = 15.0,
+            .num_frames = 15 * fps,
             .fade_to_black = true,
         },
         .{
@@ -508,14 +501,14 @@ pub fn main() !void {
             .comp = 1,
             .sign = 1.0,
             .shader = cs_image_a.name_z2,
-            .duration = 10.0,
+            .num_frames = 10 * fps,
         },
         .{
             .c = .{ 0.01, -1.0, 1.0, 0.0 },
             .comp = 2,
             .sign = -1.0,
             .shader = cs_image_a.name_z2,
-            .duration = 15.0,
+            .num_frames = 15 * fps,
             .fade_to_black = true,
         },
         .{
@@ -523,7 +516,7 @@ pub fn main() !void {
             .comp = 3,
             .sign = -1.0,
             .shader = cs_image_a.name_z2,
-            .duration = 10.0,
+            .num_frames = 10 * fps,
             .fade_to_black = true,
         },
         .{
@@ -531,7 +524,7 @@ pub fn main() !void {
             .comp = 1,
             .sign = -0.5,
             .shader = cs_image_a.name_z3,
-            .duration = 10.0,
+            .num_frames = 10 * fps,
             .fade_to_black = true,
         },
         .{
@@ -539,7 +532,7 @@ pub fn main() !void {
             .comp = 0,
             .sign = 0.01,
             .shader = cs_image_a.name_z2_cut,
-            .duration = 8.0,
+            .num_frames = 8 * fps,
             .fade_to_black = true,
         },
         .{
@@ -547,33 +540,34 @@ pub fn main() !void {
             .comp = 0,
             .sign = 0.0,
             .shader = cs_image_a.name_z2,
-            .duration = 5.0,
+            .num_frames = 5 * fps,
             .fade_to_black = true,
         },
     };
 
+    var frame_num: u32 = 0;
     var stage: u32 = 0;
-    var time: f32 = 0.0;
     {
         var i: u32 = 0;
         while (i < stage) : (i += 1) {
-            time += stages[i].duration;
+            frame_num += stages[i].num_frames;
         }
     }
 
+    var fractal_c = [4]f32{ 0.0, 0.0, 0.0, 0.0 };
+    var fractal_comp: u32 = 0;
+    var fractal_sign: f32 = 1.0;
+    var fractal_shader: c.GLuint = 0;
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         const stats = updateFrameStats(window, window_name);
-        if (real_time) {
-            time += stats.delta_time;
-        } else {
-            time = @intToFloat(f32, image_num) * (1.0 / 24.0);
-        }
+        const time = @intToFloat(f32, frame_num) * (1.0 / @intToFloat(f32, fps));
 
         var fade_to_black: bool = false;
-        var stage_time: f32 = 0.0;
+        var stages_num_frames: u32 = 0;
         var i: u32 = 0;
         while (i < stages.len) : (i += 1) {
-            if (time >= stage_time and stage == i) {
+            if (frame_num >= stages_num_frames and stage == i) {
                 stage += 1;
                 fade_to_black = stages[i].fade_to_black;
                 fractal_c = stages[i].c;
@@ -581,7 +575,7 @@ pub fn main() !void {
                 fractal_sign = stages[i].sign;
                 fractal_shader = stages[i].shader;
             }
-            stage_time += stages[i].duration;
+            stages_num_frames += stages[i].num_frames;
         }
 
         fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
@@ -597,12 +591,13 @@ pub fn main() !void {
         }
 
         if (real_time == false) {
+            var image_num: u32 = 0;
             while (true) {
-                drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
+                drawFractal(time, image_num, fractal_c, image_a, fractal_shader);
                 c.glFinish();
-                frame_num += 1;
+                image_num += 1;
 
-                if (@mod(frame_num, 5) == 0) {
+                if (image_num % 5 == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
@@ -628,8 +623,8 @@ pub fn main() !void {
                         image_data.items.ptr,
                         window_width * 3,
                     );
-                    image_num += 1;
-                    frame_num = 0;
+                    frame_num += 1;
+                    image_num = 0;
                     break;
                 }
             }
@@ -673,15 +668,15 @@ fn updateFrameStats(
     if ((now_ns - state.header_refresh_time_ns) >= std.time.ns_per_s) {
         const t = @intToFloat(f64, now_ns - state.header_refresh_time_ns) /
             std.time.ns_per_s;
-        const fps = @intToFloat(f64, state.frame_count) / t;
-        const ms = (1.0 / fps) * 1000.0;
+        const avg_fps = @intToFloat(f64, state.frame_count) / t;
+        const ms = (1.0 / avg_fps) * 1000.0;
 
         var buffer = [_]u8{0} ** 128;
         const buffer_slice = buffer[0 .. buffer.len - 1];
         const header = std.fmt.bufPrint(
             buffer_slice,
             "[{d:.1} fps  {d:.3} ms | time: {d:.2}] {s}",
-            .{ fps, ms, time, name },
+            .{ avg_fps, ms, time, name },
         ) catch buffer_slice;
 
         _ = c.glfwSetWindowTitle(window, header.ptr);
