@@ -603,7 +603,7 @@ pub fn main() !void {
                     const image_name = std.fmt.bufPrint(
                         buffer_slice,
                         "frame_{:0>5}.png",
-                        .{@intCast(u32, image_num)},
+                        .{frame_num},
                     ) catch unreachable;
 
                     c.glReadPixels(
