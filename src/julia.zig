@@ -491,7 +491,7 @@ pub fn main() !void {
         .{
             .c = .{ 0.01, 0.5, -1.0, 0.0 },
             .comp = 2,
-            .sign = 0.025,
+            .sign = 0.033,
             .shader = cs_image_a.name_z3_cut,
             .num_frames = 15 * fps,
             .fade_to_black = true,
@@ -499,14 +499,15 @@ pub fn main() !void {
         .{
             .c = .{ 0.1, -1.0, 0.0, 0.5 },
             .comp = 1,
-            .sign = 1.0,
+            .sign = 2.0,
             .shader = cs_image_a.name_z2,
-            .num_frames = 10 * fps,
+            .num_frames = 8 * fps,
+            .fade_to_black = true,
         },
         .{
             .c = .{ 0.01, -1.0, 1.0, 0.0 },
             .comp = 2,
-            .sign = -1.0,
+            .sign = -5.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 15 * fps,
             .fade_to_black = true,
@@ -514,7 +515,7 @@ pub fn main() !void {
         .{
             .c = .{ 0.01, 0.0, -1.0, 1.0 },
             .comp = 3,
-            .sign = -1.0,
+            .sign = -8.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 10 * fps,
             .fade_to_black = true,
@@ -522,17 +523,17 @@ pub fn main() !void {
         .{
             .c = .{ 0.25, 0.5, -1.0, 0.1 },
             .comp = 1,
-            .sign = -0.5,
+            .sign = -2.5,
             .shader = cs_image_a.name_z3,
-            .num_frames = 10 * fps,
+            .num_frames = 15 * fps,
             .fade_to_black = true,
         },
         .{
             .c = .{ -0.025, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
             .comp = 0,
-            .sign = 0.01,
+            .sign = 0.05,
             .shader = cs_image_a.name_z2_cut,
-            .num_frames = 8 * fps,
+            .num_frames = 10 * fps,
             .fade_to_black = true,
         },
         .{
@@ -578,7 +579,7 @@ pub fn main() !void {
             stages_num_frames += stages[i].num_frames;
         }
 
-        fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.0001 * time;
+        fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.001;
 
         if (fade_to_black) {
             c.glClearTexImage(
