@@ -23,6 +23,7 @@ const frame_loc = 0;
 const time_loc = 1;
 const resolution_loc = 2;
 const fractal_c_loc = 3;
+const beat_loc = 4;
 const image_unit = 0;
 const src =
  "  layout(" ++
@@ -30,6 +31,7 @@ const src =
  "      local_size_y = " ++ comptimePrint("{d}", .{group_size_y}) ++ ") in;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{frame_loc}) ++ ") uniform int u_frame;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{time_loc}) ++ ") uniform float u_time;\n" ++
+ "  layout(location = " ++ comptimePrint("{d}", .{beat_loc}) ++ ") uniform float u_beat;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{resolution_loc}) ++ ") uniform vec2 u_resolution;\n" ++
  "  layout(location = " ++ comptimePrint("{d}", .{fractal_c_loc}) ++ ") uniform vec4 u_fractal_c;\n" ++
  "  layout(rgba32f, binding = " ++ comptimePrint("{d}", .{image_unit}) ++ ") uniform image2D u_image;\n" ++
@@ -228,7 +230,7 @@ const src =
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
 \\      vec3 col = 0.5 + 0.5 * cos(log(tn.y) * vec3(1.0) * 0.9);
 \\      float inside = smoothstep(11.0, 12.0, tn.y);
-\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.0, 0.0, 0.60) * inside;
+\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.0, 0.0, 0.60 + u_beat) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
 \\      col = mix(mix(col, vec3(dot(col, vec3(0.3333))), -0.4), col, inside);
 \\      return clamp(col, 0.0, 1.0);
@@ -343,9 +345,10 @@ fn createShaderProgram(stype: c.GLenum, glsl: [*c]const u8, defines: [*c]const u
     return prog;
 }
 
-fn drawFractal(time: f32, frame_num: u32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint) void {
+fn drawFractal(time: f32, frame_num: u32, fractal_c: [4]f32, image_a: c.GLuint, shader: c.GLuint, beat: f32) void {
     c.glProgramUniform1i(shader, cs_image_a.frame_loc, @intCast(i32, frame_num));
     c.glProgramUniform1f(shader, cs_image_a.time_loc, time);
+    c.glProgramUniform1f(shader, cs_image_a.beat_loc, beat);
     c.glProgramUniform2f(
         shader,
         cs_image_a.resolution_loc,
@@ -428,6 +431,10 @@ pub fn main() !void {
         c.glDebugMessageCallback(handleGlError, null);
     }
 
+    const file = try std.fs.cwd().openFile("data/out_beat.clip", .{ .read = true });
+    defer file.close();
+    const file_reader = file.reader();
+
     var image_a: c.GLuint = 0;
     c.glCreateTextures(c.GL_TEXTURE_2D, 1, &image_a);
     c.glTextureStorage2D(
@@ -494,7 +501,7 @@ pub fn main() !void {
             .sign = 0.033,
             .shader = cs_image_a.name_z3_cut,
             .num_frames = 15 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ 0.1, -1.0, 0.0, 0.5 },
@@ -502,7 +509,7 @@ pub fn main() !void {
             .sign = 2.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 8 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ 0.01, -1.0, 1.0, 0.0 },
@@ -510,7 +517,7 @@ pub fn main() !void {
             .sign = -5.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 15 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ 0.01, 0.0, -1.0, 1.0 },
@@ -518,7 +525,7 @@ pub fn main() !void {
             .sign = -8.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 10 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ 0.25, 0.5, -1.0, 0.1 },
@@ -526,7 +533,7 @@ pub fn main() !void {
             .sign = -2.5,
             .shader = cs_image_a.name_z3,
             .num_frames = 15 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ -0.025, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
@@ -534,7 +541,7 @@ pub fn main() !void {
             .sign = 0.05,
             .shader = cs_image_a.name_z2_cut,
             .num_frames = 10 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
         .{
             .c = .{ 20.0, 20.0, 20.0, 20.0 },
@@ -542,7 +549,7 @@ pub fn main() !void {
             .sign = 0.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 5 * fps,
-            .fade_to_black = true,
+            //.fade_to_black = true,
         },
     };
 
@@ -591,10 +598,17 @@ pub fn main() !void {
             );
         }
 
+        const beat = blk: {
+            var file_buffer = [_]u8{0} ** 32;
+            var buf = (file_reader.readUntilDelimiterOrEof(file_buffer[0..], '\x20') catch unreachable).?;
+            break :blk std.fmt.parseFloat(f32, buf) catch unreachable;
+        };
+        //std.debug.print("Beat: {d}\n", .{beat});
+
         if (real_time == false) {
             var image_num: u32 = 0;
             while (true) {
-                drawFractal(time, image_num, fractal_c, image_a, fractal_shader);
+                drawFractal(time, image_num, fractal_c, image_a, fractal_shader, beat);
                 c.glFinish();
                 image_num += 1;
 
@@ -630,7 +644,7 @@ pub fn main() !void {
                 }
             }
         } else {
-            drawFractal(time, frame_num, fractal_c, image_a, fractal_shader);
+            drawFractal(time, frame_num, fractal_c, image_a, fractal_shader, beat);
             frame_num += 1;
         }
 
