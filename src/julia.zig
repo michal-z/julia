@@ -119,12 +119,15 @@ const src =
 \\      float n = 0.0;
 \\      float trap_dist = 1e10;
 \\
+\\      vec4 fractal_c = u_fractal_c;
+\\      fractal_c.y += u_beat;
+\\
 \\      #ifdef Z2 // z^2 + c
 \\
 \\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
-\\          z = qSquare(z) + u_fractal_c;
+\\          z = qSquare(z) + fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef CUT
 \\          trap_dist = min(trap_dist, length(z.z - 0.25) - 0.01);
@@ -146,7 +149,7 @@ const src =
 \\      float dz2 = 1.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
-\\          z = qCube(z) + u_fractal_c;
+\\          z = qCube(z) + fractal_c;
 \\          m2 = qLength2(z);
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
 \\          if (m2 > 256.0) {
