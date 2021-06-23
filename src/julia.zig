@@ -119,15 +119,12 @@ const src =
 \\      float n = 0.0;
 \\      float trap_dist = 1e10;
 \\
-\\      vec4 fractal_c = u_fractal_c;
-\\      fractal_c.y += u_beat;
-\\
 \\      #ifdef Z2 // z^2 + c
 \\
 \\      vec4 zp = vec4(1.0, 0.0, 0.0, 0.0);
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          zp = 2.0 * qMul(z, zp);
-\\          z = qSquare(z) + fractal_c;
+\\          z = qSquare(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          #ifdef CUT
 \\          trap_dist = min(trap_dist, length(z.z - 0.25) - 0.01);
@@ -149,7 +146,7 @@ const src =
 \\      float dz2 = 1.0;
 \\      for (int i = 0; i < k_num_iter; ++i) {
 \\          dz2 *= 9.0 * qLength2(qSquare(z));
-\\          z = qCube(z) + fractal_c;
+\\          z = qCube(z) + u_fractal_c;
 \\          m2 = qLength2(z);
 \\          trap_dist = min(trap_dist, length(z.xz - vec2(0.45, 0.55)) - 0.1);
 \\          if (m2 > 256.0) {
@@ -494,65 +491,57 @@ pub fn main() !void {
         comp: u32,
         sign: f32,
         shader: c.GLuint,
-        fade_to_black: bool = false,
         num_frames: u32,
     };
     const stages = [_]Stage{
-        .{
+        .{ // 0
             .c = .{ 0.01, 0.5, -1.0, 0.0 },
             .comp = 2,
             .sign = 0.033,
             .shader = cs_image_a.name_z3_cut,
             .num_frames = 15 * fps,
-            //.fade_to_black = true,
         },
-        .{
+        .{ // 1
             .c = .{ 0.1, -1.0, 0.0, 0.5 },
             .comp = 1,
             .sign = 2.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 8 * fps,
-            //.fade_to_black = true,
         },
-        .{
+        .{ // 2
             .c = .{ 0.01, -1.0, 1.0, 0.0 },
             .comp = 2,
             .sign = -5.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 15 * fps,
-            //.fade_to_black = true,
         },
-        .{
+        .{ // 3
             .c = .{ 0.01, 0.0, -1.0, 1.0 },
             .comp = 3,
             .sign = -8.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 10 * fps,
-            //.fade_to_black = true,
         },
-        .{
+        .{ // 4
             .c = .{ 0.25, 0.5, -1.0, 0.1 },
             .comp = 1,
             .sign = -2.5,
             .shader = cs_image_a.name_z3,
-            .num_frames = 15 * fps,
-            //.fade_to_black = true,
+            .num_frames = 20 * fps,
         },
-        .{
+        .{ // 5
             .c = .{ -0.025, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
             .comp = 0,
             .sign = 0.05,
             .shader = cs_image_a.name_z2_cut,
             .num_frames = 10 * fps,
-            //.fade_to_black = true,
         },
-        .{
+        .{ // 6
             .c = .{ 20.0, 20.0, 20.0, 20.0 },
             .comp = 0,
             .sign = 0.0,
             .shader = cs_image_a.name_z2,
             .num_frames = 5 * fps,
-            //.fade_to_black = true,
         },
     };
 
@@ -574,13 +563,11 @@ pub fn main() !void {
         const stats = updateFrameStats(window, window_name);
         const time = @intToFloat(f32, frame_num) * (1.0 / @intToFloat(f32, fps));
 
-        var fade_to_black: bool = false;
         var stages_num_frames: u32 = 0;
         var i: u32 = 0;
         while (i < stages.len) : (i += 1) {
             if (frame_num >= stages_num_frames and stage == i) {
                 stage += 1;
-                fade_to_black = stages[i].fade_to_black;
                 fractal_c = stages[i].c;
                 fractal_comp = stages[i].comp;
                 fractal_sign = stages[i].sign;
@@ -591,27 +578,26 @@ pub fn main() !void {
 
         fractal_c[@intCast(usize, fractal_comp)] += fractal_sign * 0.001;
 
-        if (fade_to_black) {
-            c.glClearTexImage(
-                image_a,
-                0,
-                c.GL_RGBA,
-                c.GL_FLOAT,
-                &[_]f32{ 0.0, 0.0, 0.0, 0.0 },
-            );
-        }
-
         const beat = blk: {
             var file_buffer = [_]u8{0} ** 32;
             var buf = (file_reader.readUntilDelimiterOrEof(file_buffer[0..], '\x20') catch unreachable).?;
             break :blk std.fmt.parseFloat(f32, buf) catch unreachable;
         };
-        //std.debug.print("Beat: {d}\n", .{beat});
+
+        var fractal_c_final = fractal_c;
+        if (stage == 2) {
+            fractal_c_final[1] = fractal_c[1] + 0.1 * beat;
+        } else if (stage == 3) {
+            fractal_c[1] += 0.025 * beat;
+            fractal_c_final = fractal_c;
+        } else if (stage == 5) {
+            fractal_c_final[2] = fractal_c[2] + 0.05 * beat;
+        }
 
         if (real_time == false) {
             var image_num: u32 = 0;
             while (true) {
-                drawFractal(time, image_num, fractal_c, image_a, fractal_shader, beat);
+                drawFractal(time, image_num, fractal_c_final, image_a, fractal_shader, beat);
                 c.glFinish();
                 image_num += 1;
 
@@ -647,7 +633,7 @@ pub fn main() !void {
                 }
             }
         } else {
-            drawFractal(time, frame_num, fractal_c, image_a, fractal_shader, beat);
+            drawFractal(time, frame_num, fractal_c_final, image_a, fractal_shader, beat);
             frame_num += 1;
         }
 
