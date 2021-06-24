@@ -230,7 +230,7 @@ const src =
 \\  vec3 calcSurfaceColor(vec3 pos, vec3 nor, vec2 tn) {
 \\      vec3 col = 0.5 + 0.5 * cos(log(tn.y) * vec3(1.0) * 0.9);
 \\      float inside = smoothstep(11.0, 12.0, tn.y);
-\\      col *= vec3(0.45, 0.42, 0.40) + vec3(0.0, 0.0, 0.60 + u_beat) * inside;
+\\      col *= vec3(0.45, 0.42, 0.40) + vec3(u_beat, 0.0, 0.60 + u_beat) * inside;
 \\      col = mix(col * col * (3.0 - 2.0 * col), col, inside);
 \\      col = mix(mix(col, vec3(dot(col, vec3(0.3333))), -0.4), col, inside);
 \\      return clamp(col, 0.0, 1.0);
@@ -286,7 +286,7 @@ blk: {
     if (real_time)
  "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.25));\n"
     else
- "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.1));\n";
+ "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01));\n";
 }
 ++
  "  }\n"
@@ -530,13 +530,41 @@ pub fn main() !void {
             .num_frames = 20 * fps,
         },
         .{ // 5
-            .c = .{ -0.025, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .c = .{ -0.035, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
             .comp = 0,
             .sign = 0.05,
             .shader = cs_image_a.name_z2_cut,
-            .num_frames = 10 * fps,
+            .num_frames = 15 * fps,
         },
         .{ // 6
+            .c = .{ 0.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .comp = 0,
+            .sign = 0.5,
+            .shader = cs_image_a.name_z3,
+            .num_frames = 15 * fps,
+        },
+        .{ // 7
+            .c = .{ 0.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .comp = 0,
+            .sign = 0.5,
+            .shader = cs_image_a.name_z2,
+            .num_frames = 15 * fps,
+        },
+        .{ // 8
+            .c = .{ 0.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .comp = 0,
+            .sign = 0.5,
+            .shader = cs_image_a.name_z2,
+            .num_frames = 15 * fps,
+        },
+        .{ // 9
+            .c = .{ 0.0, 6.0 / 22.0, 15.0 / 22.0, -6.0 / 22.0 },
+            .comp = 0,
+            .sign = 0.5,
+            .shader = cs_image_a.name_z2,
+            .num_frames = 60 * fps,
+        },
+        .{ // end
             .c = .{ 20.0, 20.0, 20.0, 20.0 },
             .comp = 0,
             .sign = 0.0,
@@ -592,6 +620,21 @@ pub fn main() !void {
             fractal_c_final = fractal_c;
         } else if (stage == 5) {
             fractal_c_final[2] = fractal_c[2] + 0.05 * beat;
+        } else if (stage == 6) {
+            fractal_c_final[3] = fractal_c[3] + 0.01 * beat;
+        } else if (stage == 7) {
+            fractal_c_final[3] = fractal_c[3] + 0.1 * beat;
+        } else if (stage == 9) {
+            fractal_c_final = [_]f32{ 0.5, 0.1 * beat, 0.2 * beat, 0.3 * beat };
+        } else if (stage == 10) {
+            fractal_c[0] += beat * 0.021;
+            fractal_c[1] += beat * 0.022;
+            fractal_c[2] += beat * 0.023;
+            fractal_c[3] += beat * 0.024;
+            for (fractal_c) |*fc| {
+                if (fc.* > 1.0) fc.* = -1.0 else if (fc.* < -1.0) fc.* = 1.0;
+            }
+            fractal_c_final = fractal_c;
         }
 
         if (real_time == false) {
@@ -601,7 +644,7 @@ pub fn main() !void {
                 c.glFinish();
                 image_num += 1;
 
-                if (image_num % 5 == 0) {
+                if (image_num % 25 == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
@@ -627,8 +670,12 @@ pub fn main() !void {
                         image_data.items.ptr,
                         window_width * 3,
                     );
+                    std.debug.print("Frame {:0>5} saved.\n", .{frame_num});
                     frame_num += 1;
                     image_num = 0;
+                    if (frame_num == 4531) {
+                        c.glfwSetWindowShouldClose(window, c.GLFW_TRUE);
+                    }
                     break;
                 }
             }
