@@ -284,9 +284,16 @@ const src =
 blk: {
     break :blk "\n" ++
     if (real_time)
- "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.25));\n"
+ \\      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.25));
     else
- "      imageStore(u_image, q, mix(vec4(old_col, 1.0), vec4(col, 1.0), 0.01));\n";
+\\  if (u_frame == 99) {
+\\      imageStore(u_image, q, vec4(0.01 * (old_col + col), 1.0));
+\\  } else if (u_frame == 0) {
+\\      imageStore(u_image, q, vec4(col, 1.0));
+\\  } else {
+\\      imageStore(u_image, q, vec4(old_col + col, 1.0));
+\\  }
+       ;
 }
 ++
  "  }\n"
@@ -623,7 +630,16 @@ pub fn main() !void {
         } else if (stage == 6) {
             fractal_c_final[3] = fractal_c[3] + 0.01 * beat;
         } else if (stage == 7) {
-            fractal_c_final[3] = fractal_c[3] + 0.1 * beat;
+            fractal_c_final[2] = fractal_c[2] + 0.007 * beat;
+            fractal_c[0] -= 0.007 * beat;
+            fractal_c[1] -= 0.007 * beat;
+            fractal_c[3] -= 0.007 * beat;
+            for (fractal_c) |*fc| {
+                if (fc.* > 1.0) fc.* = -1.0 else if (fc.* < -1.0) fc.* = 1.0;
+            }
+            fractal_c_final[0] = fractal_c[0];
+            fractal_c_final[1] = fractal_c[1];
+            fractal_c_final[3] = fractal_c[3];
         } else if (stage == 9) {
             fractal_c_final = [_]f32{ 0.5, 0.1 * beat, 0.2 * beat, 0.3 * beat };
         } else if (stage == 10) {
@@ -644,7 +660,7 @@ pub fn main() !void {
                 c.glFinish();
                 image_num += 1;
 
-                if (image_num % 25 == 0) {
+                if (image_num % 100 == 0) {
                     var buffer = [_]u8{0} ** 128;
                     const buffer_slice = buffer[0..];
                     const image_name = std.fmt.bufPrint(
